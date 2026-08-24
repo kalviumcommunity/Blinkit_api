@@ -1,0 +1,389 @@
+Blinkit Inventory Management System
+
+Product Requirements Document (PRD)
+Blinkit Inventory Management System — PRD
+
+1. Document Information
+Product / Project Name: Blinkit Inventory Management System
+Team Name: Not specified
+Team Members: Team Lead/Main Developer, Member B, Member C
+Version: 1.0
+Status: In Development
+Last Updated: August 21, 2026
+Development Timeline: 2 weeks
+PRD Submission Date: Not specified
+Product Completion Date: Not specified
+Ownership and Responsibilities
+Team Lead / Main Developer: Next.js frontend, backend development, API integration, overall project integration, PR
+review, and final demo.
+Member C: Assigned independent project work related to inventory/database/concurrency/logging as defined by the
+team.
+Member B: No implementation dependency for the MVP.
+
+2. Executive Summary
+The Blinkit Inventory Management System is a web application designed to help managers view products and update
+inventory stock safely and efficiently.
+Each product has its own independent stock update control. When a manager updates stock, the interface immediately
+provides optimistic feedback so the application feels responsive while the backend processes the request.
+Every successful stock change is logged with the responsible manager's ID to provide accountability and traceability.
+The most important reliability requirement is handling concurrent updates. If two managers update the same product at
+approximately the same time, one valid update must not silently overwrite the other.
+Core workflow:
+Manager views products → selects a product → enters stock change → clicks Update Stock → UI updates
+optimistically → backend validates and processes request → stock is safely persisted → inventory change is logged
+with manager ID → UI confirms or recovers from failure.
+
+3. Original Problem Statement
+"Blinkit wants inventory management where each product has an independent stock update button. Changing stock
+shows optimistic feedback and logs the change with manager ID. Concurrent updates from two managers must not
+overwrite each other."
+
+4. Problem Background
+Inventory levels can change frequently because products are received, sold, returned, damaged, or manually adjusted.
+Managers need a simple way to update the stock of an individual product without affecting unrelated products.
+When multiple managers work on the same inventory, concurrent updates can create data consistency problems. For
+example, if current stock is 100 and Manager A adds 10 while Manager B removes 5, a poorly designed system may
+save 110 and then overwrite it with 95. The expected logical result for valid delta-based changes is 105.
+The system must ensure that valid concurrent updates are handled safely. Managers also need immediate feedback
+when they update inventory, and every successful inventory change must be traceable to the responsible manager.
+
+5. Product Vision
+To provide a simple, responsive, and reliable inventory management experience where managers can independently
+update product stock, immediately understand the state of their actions, and trust that valid concurrent updates will not
+silently disappear.
+
+6. Goals
+P0 — Core MVP Goals
+• Display inventory products and current stock.
+• Allow each product to be updated independently.
+• Allow managers to submit stock changes.
+• Provide optimistic feedback immediately after an update is initiated.
+• Persist successful stock updates.
+• Log every successful stock update with manager ID.
+• Prevent valid concurrent updates from silently overwriting each other.
+• Handle failed optimistic updates correctly.
+• Provide a complete working end-to-end demonstration.
+P1 — Important Enhancements
+• Loading states, empty states, clear success and error messages.
+• Inventory history view.
+• Low-stock indicators.
+• Improved validation feedback.
+P2 — Future Enhancements
+• Product search and filtering.
+
+• Product creation and deletion.
+• Role-based permissions.
+• Advanced analytics.
+• Multi-location inventory.
+• Barcode integration and mobile applications.
+
+7. Non-Goals / Out of Scope
+The MVP will not attempt to build a complete enterprise inventory management platform. Out of scope: real production
+integration with Blinkit, payment processing, delivery management, supplier management, AI demand prediction,
+advanced analytics, native mobile applications, complex enterprise permissions, multi-warehouse optimization,
+barcode hardware integration, and automated purchase ordering.
+
+8. Target Users / Personas
+Primary Persona — Inventory Manager
+Role: Manager responsible for maintaining product inventory.
+Goals: View current stock, update products quickly, receive immediate feedback, and trust that changes are saved
+correctly.
+Pain Points: Slow feedback, accidentally affecting the wrong product, losing changes because another manager
+updated the same product, and lack of accountability.
+Expectation: Each product has an independent update action and clearly communicates whether the update is
+processing, successful, or failed.
+Secondary Persona — Evaluator / Reviewer
+Role: Mentor, interviewer, evaluator, or project reviewer.
+Goals: Verify independent product updates, optimistic feedback, manager ID logging, and concurrency protection.
+
+9. Product Terminology
+Product: An inventory item whose stock can be managed.
+Stock: Current quantity available for a product.
+Stock Change: A positive or negative quantity applied to current stock.
+Manager: A person responsible for inventory updates.
+Manager ID: Identifier associated with a stock update.
+Inventory Log: Persistent record of a stock change.
+Optimistic Update: Updating the UI immediately before backend confirmation.
+Concurrent Update: Multiple updates occurring close enough in time to affect the same inventory state.
+Lost Update: A valid update being unintentionally overwritten by another update.
+Source of Truth: The backend/database state considered authoritative.
+
+10. Product Assumptions
+
+MVP Assumption — Stock updates are delta-based. Example: current stock 120, change +10, new stock 130. This
+makes valid concurrent changes easier to preserve.
+MVP Assumption — Stock cannot become negative.
+MVP Assumption — Manager ID is available with every update; a complete authentication system is not required
+unless separately specified.
+Recommended Product Decision — The backend/database is the source of truth. The frontend may temporarily display
+optimistic state, but confirmed backend state is authoritative.
+
+11. End-to-End User Journey
+1. Manager opens the inventory dashboard.
+2. Application loads available products.
+3. Manager sees current stock for each product.
+4. Manager selects a product and enters a positive or negative stock
+change.
+5. Manager clicks that product's Update Stock button.
+6. UI immediately applies optimistic feedback and only that product enters
+Updating state.
+7. Frontend sends the request to the backend.
+8. Backend validates and safely processes the request.
+9. Backend persists the stock and creates an inventory log with manager
+ID.
+10. Frontend reconciles optimistic state with the confirmed result.
+11. On failure, the UI rolls back or refreshes authoritative stock, shows an
+understandable error, and allows retry where appropriate.
+
+12. UI/UX Screens
+Inventory Dashboard: Shows product name, optional category, current stock, stock change input, independent Update
+Stock button, and update status. States include loading, available products, empty inventory, updating, success, and
+error.
+Product Update Feedback: Can be within each product card. State flow: Idle → Updating → Success, or Idle →
+Updating → Failed → Retry.
+Inventory History (P1): Product, previous stock, change amount, resulting stock, manager ID, and timestamp.
+
+13. Core Data/Input Specification
+Product conceptual fields: id, name, category, stock.
+Stock update request fields:
+• Product ID — required.
+• Change — required positive or negative numeric quantity.
+• Manager ID — required.
+Example request: { "change": 10, "managerId": "manager-123" }
+
+14. Validation Rules
+Request-Level Validation: Product ID, numeric stock change, and manager ID are required.
+Business Validation: newStock = currentStock + change, and newStock must be >= 0.
+Product Validation: Requested product must exist. If not, no stock change occurs and the user receives a clear error.
+
+15. Core Business Logic
+Primary rule: newStock = currentStock + requestedChange.
+Concurrent update rule: valid concurrent updates must not silently overwrite each other. Example: initial 100, Manager
+A +10, Manager B -5; expected logical result 105.
+Recommended Product Decision: The backend should use a concurrency-safe update mechanism rather than trusting
+the stock value previously displayed by the frontend.
+
+16. Status Model
+Loading: Product data is being retrieved.
+Ready: Product is available and not updating.
+Updating: Stock update request is processing.
+Success: Backend confirmed the update.
+Validation Error: Input or business rule is invalid.
+System Error: Request failed due to network or server issues.
+
+17. Main Processing Flow
+Stock update request → validate request → verify product exists → validate manager information → apply
+concurrency-safe stock update → verify resulting stock → persist stock → create inventory log → return confirmed
+result.
+Frontend: submit update → save current UI state → apply optimistic update → show Updating → send API request.
+Success: reconcile stock → clear Updating → show success.
+Failure: rollback or fetch latest stock → clear Updating → show error → allow retry.
+
+18. Functional Requirements
+
+FR-01 Display Products — P0: Display available products with name and current stock.
+FR-02 Independent Product Updates — P0: Each product has its own input and action; updating Product A
+does not modify Product B.
+FR-03 Submit Stock Changes — P0: Manager can submit positive or negative stock changes.
+FR-04 Prevent Negative Stock — P0: Updates resulting in stock below zero are rejected.
+FR-05 Optimistic Feedback — P0: Affected product immediately reflects the optimistic change and shows
+Updating.
+FR-06 Independent Updating State — P0: Updating one product does not automatically disable unrelated
+products.
+FR-07 Persist Stock — P0: Successful updates are stored and remain after refresh.
+FR-08 Log Manager ID — P0: Every successful stock update creates a log associated with the manager ID.
+FR-09 Concurrent Update Protection — P0: Valid concurrent updates do not silently overwrite one another.
+FR-10 Failed Optimistic Update Recovery — P0: UI does not permanently display an incorrect unconfirmed
+value.
+
+19. Non-Functional Requirements
+Performance: MVP Design Target — provide immediate local UI feedback without waiting for backend completion.
+Reliability: Failed updates must not leave the UI permanently displaying incorrect stock.
+Data Integrity: Successful stock updates and inventory logs should remain consistent.
+Maintainability: Frontend handles UI/state/API communication; backend handles validation, business logic, persistence,
+and concurrency.
+Accessibility: Clear labels, keyboard-accessible controls, visible loading states, and understandable errors.
+
+20. Data Model — Conceptual Level
+Product: id, name, category, stock, createdAt, updatedAt.
+Inventory Log: id, productId, managerId, previousStock, change, resultingStock, createdAt.
+Manager: id, name or identifier.
+
+21. API / Integration Expectations
+Retrieve products: GET /api/products.
+Update stock: PATCH /api/products/:id/stock with change and managerId.
+Example response should return the confirmed product stock and a success message.
+Recommended consistent error format: error code plus human-readable message.
+Possible codes: VALIDATION_ERROR, PRODUCT_NOT_FOUND, CONFLICT, INTERNAL_ERROR.
+
+22. Persistence and Refresh Behaviour
+Refresh reloads latest product data from the backend. Successfully persisted updates remain available after closing
+and reopening the browser. Unconfirmed optimistic updates are not treated as permanently saved. On network failure,
+end Updating, restore or reconcile stock, show an error, and allow retry where appropriate.
+
+23. Error Handling
+User/Input Errors: Reject and explain what must be corrected.
+Business Errors: Product missing or negative resulting stock; do not persist.
+Operation Errors: Reconcile optimistic UI state.
+System Errors: End updating, restore or refresh correct stock, show an understandable error, and allow retry.
+
+24. Edge Cases
+Empty inventory; missing product; empty or non-numeric input; zero change; negative resulting stock; rapid repeated
+clicks; two managers updating the same product; simultaneous updates to different products; network failure after
+optimistic feedback; backend failure; refresh after successful update; refresh while pending; duplicate requests.
+
+25. Security and Privacy
+Validate all input on the backend, do not trust frontend validation alone, do not expose secrets in frontend code, use
+environment variables for sensitive configuration, and avoid logging secrets or unnecessary sensitive information.
+MVP Assumption: A controlled manager ID may be used until formal authentication is required.
+26. Performance / Scale Assumptions
+MVP Design Target: Support the demonstration dataset and multiple independent product updates without noticeable
+UI blocking. Advanced pagination and large-scale optimization are outside the MVP unless required later.
+
+27. Technology Constraints
+Fixed Technology: Next.js.
+Existing project direction: client/ and Server/.
+MVP Assumption: Backend uses Node.js and Express based on the existing project direction.
+Recommended supporting tools: Git, GitHub, ESLint, environment variables, and Postman or equivalent API testing
+tool.
+Database technology is not officially specified.
+
+28. High-Level Technical Direction
+Next.js Frontend → Backend API → Inventory Business Logic → Persistent Storage → Products + Inventory Logs.
+Detailed architecture belongs in HLD/LLD.
+
+29. Team Ownership
+Team Lead / Main Developer: Next.js frontend, inventory dashboard, product UI, stock update UI, optimistic feedback,
+backend, API development, integration, PR review, and final demo.
+Member C: Independent assigned work related to inventory/database functionality, logging, concurrency-related
+functionality, and testing of assigned features; integration coordinated with the Team Lead.
+
+Member B: Not a dependency for MVP implementation; no critical functionality depends on Member B.
+
+30. Git / GitHub Workflow
+main represents stable integrated work. Feature work uses separate branches. Workflow: create branch → implement
+focused feature → test locally → commit → push → create PR → review → merge.
+Recommended commit examples: feat: add stock update endpoint; feat: add optimistic stock feedback; fix: prevent
+negative stock; fix: handle failed stock update; docs: add project PRD.
+
+31. Project Management
+Recommended board: Backlog → Ready → In Progress → In Review → Blocked → Done.
+Useful fields: Owner, Priority, Area, Milestone, Due Date, PR Link.
+
+32. CI/CD
+Recommended PR checks where practical: install dependencies, lint, verify build, and run relevant tests. Keep CI
+lightweight and appropriate for the MVP. Deployment requirements are not specified.
+
+33. Testing Strategy
+Mandatory: product loading, independent updates, positive and negative stock changes, negative stock prevention,
+optimistic feedback, failed update recovery, manager ID logging, concurrent update protection, and persistence after
+refresh.
+Recommended: frontend component/input/optimistic-state tests; backend API/validation/logging/concurrency tests;
+integration request/response/error/refresh testing.
+Manual Demo Verification: Use deterministic demo data and test the full workflow before submission.
+
+34. Acceptance Criteria
+AC-01 Product Display: Given products exist, when manager opens dashboard, then products and current
+stock are displayed.
+AC-02 Independent Updates: Given multiple products, when Product A is updated, then Product B remains
+unchanged.
+AC-03 Valid Increase: Given stock 120, when +10 is submitted, then confirmed stock is 130.
+AC-04 Valid Decrease: Given stock 120, when -20 is submitted, then confirmed stock is 100.
+AC-05 Negative Prevention: Given stock 5, when -10 is submitted, then update is rejected and persisted stock
+remains 5.
+AC-06 Optimistic Feedback: Given a valid update, when backend processing is pending, then affected product
+immediately reflects the optimistic change and shows Updating.
+AC-07 Failed Recovery: Given an optimistic update, when backend rejects or fails, then UI does not
+permanently show an incorrect value and displays an understandable error.
+AC-08 Inventory Logging: Given a successful update, when backend persists it, then a log exists with the
+manager ID.
+
+AC-09 Concurrent Protection: Given two managers update the same product concurrently, when both valid
+requests are processed, then one valid update does not silently overwrite the other.
+
+35. Success Metrics / Definition of Success
+The MVP is successful when it demonstrably provides product viewing, independent updates, optimistic feedback,
+negative stock prevention, persistence, manager ID logging, concurrency protection, and complete frontend/backend
+integration.
+
+36. Demo Dataset / Demo Preparation
+Recommended deterministic products: Amul Milk — Dairy — 120; Maggi Noodles — Grocery — 85; Brown Bread —
+Bakery — 40; Coca Cola — Beverages — 200.
+Happy path: Amul Milk 120 + 10 = 130.
+Decrease: Brown Bread 40 - 10 = 30.
+Validation failure: Brown Bread 30 - 50 → Rejected.
+Concurrency: Initial 100; Manager A +10; Manager B -5; expected 105.
+
+37. Final Demo Flow
+1. Open dashboard.
+2. Show multiple products and stock.
+3. Update one product.
+4. Show only that product changes.
+5. Demonstrate optimistic feedback.
+6. Confirm backend update.
+7. Demonstrate negative stock validation.
+8. Show inventory log with manager ID.
+9. Demonstrate concurrent updates to the same product.
+10. Show valid updates are not silently overwritten.
+11. Refresh and show persisted stock.
+
+38. Risks and Mitigations
+Concurrency complexity — High — Test concurrent updates early.
+Frontend/backend mismatch — High — Define API contracts before integration.
+
+Scope creep — Medium — Complete P0 before P1/P2.
+Optimistic UI inconsistency — High — Implement rollback or authoritative refresh.
+Database integration delay — High — Integrate persistence early.
+Tight deadline — High — Build end-to-end P0 workflow early.
+Unclear authentication requirement — Medium — Use documented MVP assumption for manager ID.
+Demo failure — High — Use deterministic data and rehearse.
+
+39. Delivery Plan
+Phase 1 — Product and Technical Foundation: finalize requirements, repository workflow, Next.js setup,
+backend foundation.
+Phase 2 — Frontend Core: dashboard, product cards, stock inputs, independent controls, validation.
+Phase 3 — Backend Core: product APIs, stock update API, validation, persistence, manager ID handling.
+Phase 4 — Logging and Concurrency: inventory logs, concurrency protection, concurrent update testing.
+Phase 5 — Integration: connect frontend/backend, replace mock logic, implement real optimistic updates,
+handle failure/reconciliation.
+Phase 6 — Testing: API, validation, concurrency, refresh persistence testing.
+Phase 7 — Final Preparation: demo dataset, rehearsal, documentation review, final end-to-end testing.
+All phases are Recommended Team Milestones within the approximately two-week development timeline.
+
+40. Future Roadmap
+Usability: search, filtering, sorting, low-stock indicators.
+Inventory: product creation/editing/deletion and adjustment reasons.
+User Management: authentication, manager profiles, role-based permissions.
+Reporting: inventory movement history, manager activity, stock trends.
+Scale: pagination, multi-location inventory, advanced monitoring.
+
+41. Open Questions
+1. What database technology will be used?
+2. Is full authentication required, or is a controlled manager ID sufficient for
+MVP?
+3. Should inventory history be visible in the frontend or only stored in
+backend?
+4. Should a stock change of 0 be allowed?
+5. Is deployment required for final evaluation?
+
+6. Are any mandatory technologies required beyond Next.js?
+Current MVP Assumption: Stock updates are delta-based rather than replacing the complete stock value.
+
+42. Key Product Principles
+Reliability before unnecessary complexity.
+Each product update remains independent.
+UI responds immediately.
+Backend/database is the durable source of truth.
+Failed optimistic updates recover correctly.
+Valid concurrent changes do not silently disappear.
+Every successful inventory change is traceable to a manager.
+Core functionality is completed before optional features.
+
+43. Final MVP Scope Summary
+When complete, the Blinkit Inventory Management System will provide managers with a Next.js-based inventory
+dashboard where products can be viewed and updated independently. Managers can submit stock increases or
+decreases and receive immediate optimistic feedback while the backend processes requests. Successful updates are
+validated, persisted, and logged with a manager ID. The system protects valid concurrent updates from silently
+overwriting each other and correctly recovers from failed optimistic updates. The MVP focuses on a reliable end-to-end
+inventory update workflow within the project's approximately two-week timeline rather than unnecessary enterprise
+features.
