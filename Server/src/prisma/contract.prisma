@@ -1,0 +1,28 @@
+// use prisma-next
+// Contract inferred from the live database schema. Edit as needed, then run `prisma contract emit`.
+
+model InventoryLogs {
+  id        Int        @id(map: "inventory_logs_pkey") @default(autoincrement())
+  productId Int        @map("product_id")
+  managerId Int        @map("manager_id")
+  change    Int
+  oldStock  Int        @map("old_stock")
+  newStock  Int        @map("new_stock")
+  createdAt Timestamp? @default(now()) @map("created_at")
+
+  @@check(expression: "(new_stock >= 0)", map: "new_stock_cannot_be_negative")
+  @@check(expression: "(old_stock >= 0)", map: "old_stock_cannot_be_negative")
+  @@map("inventory_logs")
+}
+
+model Products {
+  id        Int            @id(map: "products_pkey") @default(autoincrement())
+  name      VarChar(100)
+  category  VarChar(100)
+  stock     Int            @default(0)
+  updatedAt Timestamp?     @default(now()) @map("updated_at")
+  price     Numeric(10, 2)
+
+  @@check(expression: "(stock >= 0)", map: "stock_cannot_be_negative")
+  @@map("products")
+}
