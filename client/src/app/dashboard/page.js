@@ -1,10 +1,26 @@
 "use client";
 
-import { useState } from "react";
-import productsData from "../../data/products.js";
+import { useEffect, useState } from "react";
 
 export default function Dashboard() {
-  const [products, setProducts] = useState(productsData);
+  const [products, setProducts] = useState([]);
+
+  useEffect(() => {
+    fetch("http://localhost:5000/api/products")
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Failed to fetch products");
+        }
+
+        return response.json();
+      })
+      .then((data) => {
+        setProducts(data);
+      })
+      .catch((error) => {
+        console.error("Failed to load products:", error);
+      });
+  }, []);
 
   const totalProducts = products.length;
 
@@ -14,7 +30,7 @@ export default function Dashboard() {
   );
 
   const lowStockProducts = products.filter(
-    (product) => product.stock <= product.threshold
+    (product) => product.stock <= 10
   );
 
   const outOfStockProducts = products.filter(
@@ -211,6 +227,7 @@ export default function Dashboard() {
               <div className="stat-icon green">
                 ▣
               </div>
+
             </div>
 
             <h2>
@@ -287,7 +304,7 @@ export default function Dashboard() {
             </h2>
 
             <p className="danger-text">
-              1 item was out of stock
+              {outOfStockProducts.length} items are out of stock
             </p>
 
           </div>
@@ -372,13 +389,13 @@ export default function Dashboard() {
 
                   <path
                     d="
-                    M 20 125
-                    L 120 145
-                    L 220 130
-                    L 320 128
-                    L 420 80
-                    L 520 85
-                    L 620 110
+                      M 20 125
+                      L 120 145
+                      L 220 130
+                      L 320 128
+                      L 420 80
+                      L 520 85
+                      L 620 110
                     "
                     fill="none"
                     stroke="currentColor"
@@ -388,16 +405,16 @@ export default function Dashboard() {
 
                   <path
                     d="
-                    M 20 125
-                    L 120 145
-                    L 220 130
-                    L 320 128
-                    L 420 80
-                    L 520 85
-                    L 620 110
-                    L 620 250
-                    L 20 250
-                    Z
+                      M 20 125
+                      L 120 145
+                      L 220 130
+                      L 320 128
+                      L 420 80
+                      L 520 85
+                      L 620 110
+                      L 620 250
+                      L 20 250
+                      Z
                     "
                     fill="url(#stockGradient)"
                     stroke="none"
@@ -551,7 +568,7 @@ export default function Dashboard() {
                   {products.map((product) => {
 
                     const isLow =
-                      product.stock <= product.threshold;
+                      product.stock <= 10;
 
                     const isOut =
                       product.stock === 0;
@@ -565,7 +582,7 @@ export default function Dashboard() {
                           <div className="product-name">
 
                             <span className="product-emoji">
-                              {product.image}
+                              📦
                             </span>
 
                             <strong>
@@ -585,7 +602,7 @@ export default function Dashboard() {
                         </td>
 
                         <td>
-                          {product.threshold}
+                          10
                         </td>
 
                         <td>
@@ -657,14 +674,14 @@ export default function Dashboard() {
               <div className="quick-buttons">
 
                 <button
-                  onClick={() => increaseStock("1")}
+                  onClick={() => increaseStock(1)}
                 >
                   <span>＋</span>
                   Increase Stock
                 </button>
 
                 <button
-                  onClick={() => decreaseStock("1")}
+                  onClick={() => decreaseStock(1)}
                 >
                   <span>−</span>
                   Decrease Stock
@@ -708,7 +725,7 @@ export default function Dashboard() {
                 >
 
                   <div className="top-product-image">
-                    {product.image}
+                    📦
                   </div>
 
                   <div className="top-product-info">
@@ -787,6 +804,7 @@ function Activity({
             : "activity-value negative"
         }
       >
+
         {value}
 
         <small>
