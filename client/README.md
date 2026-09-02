@@ -1,3 +1,96 @@
+# Blinkit Inventory Management System
+
+A full-stack inventory management application built to manage product stock, track inventory changes, and maintain a history of stock updates.
+
+The project is based on the following problem statement:
+
+> **Blinkit wants inventory management where each product has an independent stock update button. Changing stock shows optimistic feedback and logs the change with manager ID. Concurrent updates from two managers must not overwrite each other.**
+
+---
+
+## 🚀 Project Overview
+
+The Blinkit Inventory Management System allows managers to view products, monitor inventory, update stock independently, and track inventory changes.
+
+The application focuses on solving three important inventory problems:
+
+1. Managing product stock efficiently.
+2. Providing immediate feedback when stock is updated.
+3. Preventing concurrent updates from overwriting each other.
+
+Every stock update should also be recorded with the responsible manager's ID to maintain an inventory history.
+
+---
+
+## ✨ Core Features
+
+### Dashboard
+
+The dashboard provides an overview of the inventory, including:
+
+- Total products
+- Total available stock
+- Low stock items
+- Out-of-stock items
+- Stock trends
+- Recent inventory activities
+- Low stock alerts
+- Quick actions
+
+---
+
+### Product Management
+
+Users can:
+
+- View available products
+- View product details
+- Monitor current stock
+- Identify low-stock products
+- Identify out-of-stock products
+
+---
+
+### Independent Stock Updates
+
+Each product has its own stock update functionality.
+
+Managers can:
+
+- Increase stock
+- Decrease stock
+- Update stock independently for individual products
+
+Example:
+
+```text
+Product: Milk
+Current Stock: 20
+
+Manager A → +10
+New Stock → 30
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
 ## Getting Started
