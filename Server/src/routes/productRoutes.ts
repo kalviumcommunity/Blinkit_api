@@ -47,54 +47,117 @@ router.patch("/products/:id/stock", async (req, res) => {
       });
     }
 
-    // Find the product
-    const product = await db.orm.public.Products
-      .where({ id: productId })
-      .first();
+    // Run stock update and inventory log inside one transaction
+    const result = await db.transaction(async (tx) => {
 
-    if (!product) {
-      return res.status(404).json({
-        message: "Product not found",
-      });
-    }
+      // Read the current product inside the transaction
+      const product = await tx.orm.public.Products
+        .where({ id: productId })
+        .first();
 
-    // Calculate new stock
-    const oldStock = product.stock;
-    const newStock = oldStock + change;
+      // Product does not exist
+      if (!product) {
+        const error = new Error("Product not found");
+        error.name = "PRODUCT_NOT_FOUND";
+        throw error;
+      }
 
-    // Prevent negative stock
-    if (newStock < 0) {
-      return res.status(400).json({
-        message: "Stock cannot be negative",
-      });
-    }
+      const oldStock = product.stock;
+      const newStock = oldStock + change;
 
-    // Update the product
-    const updatedProduct = await db.orm.public.Products
-      .where({ id: productId })
-      .update({
-        stock: newStock,
-      });
+      // Prevent negative stock
+      if (newStock < 0) {
+        const error = new Error("Stock cannot be negative");
+        error.name = "NEGATIVE_STOCK";
+        throw error;
+      }
 
-    // Create inventory log
-    const inventoryLog = await db.orm.public.InventoryLogs.create({
-      productId,
-      managerId,
-      change,
-      oldStock,
-      newStock,
+      /*
+       * Concurrency protection:
+       *
+       * Only update the product if its stock is still equal
+       * to the value that we originally read.
+       *
+       * If another request changed the stock first,
+       * this update will return null instead of overwriting it.
+       */
+      const updatedProduct = await tx.orm.public.Products
+        .where({
+          id: productId,
+          stock: oldStock,
+        })
+        .update({
+          stock: newStock,
+        });
+
+      // Another request changed the stock first
+      if (!updatedProduct) {
+        const error = new Error(
+          "Stock was changed by another request. Please try again."
+        );
+
+        error.name = "CONCURRENCY_CONFLICT";
+        throw error;
+      }
+
+      // Create inventory log in the same transaction
+      const inventoryLog =
+        await tx.orm.public.InventoryLogs.create({
+          productId,
+          managerId,
+          change,
+          oldStock,
+          newStock,
+        });
+
+      return {
+        product: updatedProduct,
+        inventoryLog,
+      };
     });
 
     res.json({
       message: "Stock updated successfully",
-      product: updatedProduct,
-      inventoryLog,
+      product: result.product,
+      inventoryLog: result.inventoryLog,
     });
 
   } catch (error) {
     console.error("Failed to update stock:", error);
 
-    res.status(500).json({
+    // Product not found
+    if (
+      error instanceof Error &&
+      error.name === "PRODUCT_NOT_FOUND"
+    ) {
+      return res.status(404).json({
+        message: "Product not found",
+      });
+    }
+
+    // Negative stock
+    if (
+      error instanceof Error &&
+      error.name === "NEGATIVE_STOCK"
+    ) {
+      return res.status(400).json({
+        message: "Stock cannot be negative",
+      });
+    }
+
+    // Concurrency conflict
+    if (
+      error instanceof Error &&
+      error.name === "CONCURRENCY_CONFLICT"
+    ) {
+      return res.status(409).json({
+        message:
+          "Stock was changed by another request. Please try again.",
+      });
+    }
+
+    // Other database/server errors
+    return res.status(500).json({
       message: "Failed to update stock",
     });
   }
