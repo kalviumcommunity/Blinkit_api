@@ -1,3 +1,3 @@
 # Blinkit_api
 
-Credits to -: 
+Credits to -: Sanskriti kant
