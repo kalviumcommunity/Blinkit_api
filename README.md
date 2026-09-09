@@ -1,3 +1,4 @@
 # Blinkit_api
-hwwwwwwwwwwllllllllllloooooooooooooooooooon 
-my ugly teammatesssssssssssssssssssssss!!!!!!!!!!!
+
+Credits to -: Sanskriti kant (Database)
+                Devesh (Frontend)
