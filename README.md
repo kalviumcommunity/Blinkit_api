@@ -1,1 +1,4 @@
-# Blinkit_api devesh 
+# Blinkit_api
+
+Credits to -: Sanskriti kant (Database)
+                Devesh (Frontend)
