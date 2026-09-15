@@ -4,11 +4,6 @@ import { param } from "@prisma/orm-postgres/relational-core/expression";
 
 const router = Router();
 
-// ======================================================
-// CREATE PRODUCT
-// POST /api/products
-// ======================================================
-
 router.post("/products", async (req, res) => {
   try {
     const { name, category, stock, price } = req.body;
@@ -105,11 +100,6 @@ router.get("/products/:id", async (req, res) => {
   }
 });
 
-// ======================================================
-// UPDATE PRODUCT
-// PATCH /api/products/:id
-// ======================================================
-
 router.patch("/products/:id", async (req, res) => {
   try {
     const productId = Number(req.params.id);
@@ -133,9 +123,6 @@ router.patch("/products/:id", async (req, res) => {
         message: "Product not found",
       });
     }
-
-    // We use an object here because Prisma's PostgreSQL
-    // update() expects a normal data object.
     const updateData: any = {};
 
     if (name !== undefined) {
@@ -187,11 +174,6 @@ router.patch("/products/:id", async (req, res) => {
   }
 });
 
-// ======================================================
-// DELETE PRODUCT
-// DELETE /api/products/:id
-// ======================================================
-
 router.delete("/products/:id", async (req, res) => {
   try {
     const productId = Number(req.params.id);
@@ -232,19 +214,11 @@ router.delete("/products/:id", async (req, res) => {
   }
 });
 
-// ======================================================
-// UPDATE STOCK
-// PATCH /api/products/:id/stock
-// ======================================================
-
 router.patch("/products/:id/stock", async (req, res) => {
   try {
     const productId = Number(req.params.id);
     const { change, managerId } = req.body;
 
-    // --------------------------------------------------
-    // VALIDATION
-    // --------------------------------------------------
 
     if (!Number.isInteger(productId)) {
       return res.status(400).json({
@@ -263,11 +237,6 @@ router.patch("/products/:id/stock", async (req, res) => {
         message: "managerId must be an integer",
       });
     }
-
-    // --------------------------------------------------
-    // TRANSACTION
-    // --------------------------------------------------
-
     const result = await db.transaction(async (tx) => {
       // First check that the product exists.
       const product = await tx.orm.public.Products
@@ -419,6 +388,27 @@ router.patch("/products/:id/stock", async (req, res) => {
     // Unexpected server/database error
     return res.status(500).json({
       message: "Failed to update stock",
+    });
+  }
+});
+
+// ======================================================
+// GET INVENTORY LOGS
+// GET /api/inventory-logs
+// ======================================================
+
+router.get("/inventory-logs", async (_req, res) => {
+  try {
+    const logs = await db.orm.public.InventoryLogs.all();
+
+    return res.json({
+      logs,
+    });
+  } catch (error) {
+    console.error("Failed to fetch inventory logs:", error);
+
+    return res.status(500).json({
+      message: "Failed to fetch inventory logs",
     });
   }
 });
