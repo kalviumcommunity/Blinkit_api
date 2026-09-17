@@ -28,3 +28,6 @@ Backend API for managing products, stock, and inventory logs using Node.js, Expr
 ## Tech Stack
 
 Node.js • Express • TypeScript • PostgreSQL • Prisma
+Credits to -: Sanskriti kant (Database)
+                Devesh (Frontend)
+                Deepak (overall)

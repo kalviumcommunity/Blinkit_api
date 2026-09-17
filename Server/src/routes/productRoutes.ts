@@ -392,6 +392,16 @@ router.patch("/products/:id/stock", async (req, res) => {
   }
 });
 
+router.get("/inventory-logs", async (_req, res) => {
+  try {
+    const logs =
+      await db.orm.public.InventoryLogs.all();
+
+    res.json(logs);
+  } catch (error) {
+    console.error("Failed to fetch inventory logs:", error);
+
+    res.status(500).json({
 // ======================================================
 // GET INVENTORY LOGS
 // GET /api/inventory-logs
@@ -412,5 +422,6 @@ router.get("/inventory-logs", async (_req, res) => {
     });
   }
 });
+
 
 export default router;
