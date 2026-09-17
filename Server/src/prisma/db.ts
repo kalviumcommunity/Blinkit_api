@@ -9,3 +9,7 @@ export const db = postgres<Contract>({
   contractJson,
   url: process.env["DATABASE_URL"]!,
 });
+
+export async function connectDatabase() {
+  await db.connect();
+}
