@@ -1,47 +1,39 @@
 import { Router } from "express";
-
 import { db } from "../prisma/db";
+import { param } from "@prisma/orm-postgres/relational-core/expression";
 
 const router = Router();
 
-// =====================================================
-// CREATE PRODUCT
-// POST /api/products
-// =====================================================
-
 router.post("/products", async (req, res) => {
   try {
-    const { name, category, price, stock } = req.body;
+    const { name, category, stock, price } = req.body;
 
-    // Validate required fields
-    if (
-      typeof name !== "string" ||
-      typeof category !== "string" ||
-      (typeof price !== "number" && typeof price !== "string")
-    ) {
+    if (!name || !category || stock === undefined || price === undefined) {
       return res.status(400).json({
-        message: "name, category and price are required",
+        message: "name, category, stock and price are required",
       });
     }
 
-    // Stock is optional, default to 0
-    const productStock = stock ?? 0;
-
-    if (!Number.isInteger(productStock) || productStock < 0) {
+    if (!Number.isInteger(stock) || stock < 0) {
       return res.status(400).json({
         message: "stock must be a non-negative integer",
       });
     }
 
-    const productData = {
+    const numericPrice = Number(price);
+
+    if (Number.isNaN(numericPrice) || numericPrice < 0) {
+      return res.status(400).json({
+        message: "price must be a non-negative number",
+      });
+    }
+
+    const product = await db.orm.public.Products.create({
       name,
       category,
-      price: String(price),
-      stock: productStock,
-    };
-
-    const product =
-      await db.orm.public.Products.create(productData as any);
+      stock,
+      price: numericPrice as any,
+    });
 
     return res.status(201).json({
       message: "Product created successfully",
@@ -56,16 +48,15 @@ router.post("/products", async (req, res) => {
   }
 });
 
-// =====================================================
-// GET ALL PRODUCTS
-// GET /api/products
-// =====================================================
+
 
 router.get("/products", async (_req, res) => {
   try {
     const products = await db.orm.public.Products.all();
 
-    return res.json(products);
+    return res.json({
+      products,
+    });
   } catch (error) {
     console.error("Failed to fetch products:", error);
 
@@ -75,16 +66,10 @@ router.get("/products", async (_req, res) => {
   }
 });
 
-// =====================================================
-// GET ONE PRODUCT
-// GET /api/products/:id
-// =====================================================
-
 router.get("/products/:id", async (req, res) => {
   try {
     const productId = Number(req.params.id);
 
-    // Validate product ID
     if (!Number.isInteger(productId)) {
       return res.status(400).json({
         message: "Invalid product ID",
@@ -92,7 +77,9 @@ router.get("/products/:id", async (req, res) => {
     }
 
     const product = await db.orm.public.Products
-      .where({ id: productId })
+      .where({
+        id: productId,
+      })
       .first();
 
     if (!product) {
@@ -101,7 +88,9 @@ router.get("/products/:id", async (req, res) => {
       });
     }
 
-    return res.json(product);
+    return res.json({
+      product,
+    });
   } catch (error) {
     console.error("Failed to fetch product:", error);
 
@@ -111,74 +100,22 @@ router.get("/products/:id", async (req, res) => {
   }
 });
 
-// =====================================================
-// UPDATE PRODUCT
-// PATCH /api/products/:id
-// =====================================================
-
 router.patch("/products/:id", async (req, res) => {
   try {
     const productId = Number(req.params.id);
 
-    // Validate product ID
     if (!Number.isInteger(productId)) {
       return res.status(400).json({
         message: "Invalid product ID",
       });
     }
 
-    const { name, category, price, stock } = req.body;
+    const { name, category, stock, price } = req.body;
 
-    // Make sure at least one field is provided
-    if (
-      name === undefined &&
-      category === undefined &&
-      price === undefined &&
-      stock === undefined
-    ) {
-      return res.status(400).json({
-        message: "At least one field is required",
-      });
-    }
-
-    // Validate name
-    if (name !== undefined && typeof name !== "string") {
-      return res.status(400).json({
-        message: "name must be a string",
-      });
-    }
-
-    // Validate category
-    if (category !== undefined && typeof category !== "string") {
-      return res.status(400).json({
-        message: "category must be a string",
-      });
-    }
-
-    // Validate price
-    if (
-      price !== undefined &&
-      typeof price !== "number" &&
-      typeof price !== "string"
-    ) {
-      return res.status(400).json({
-        message: "price must be a number or string",
-      });
-    }
-
-    // Validate stock
-    if (
-      stock !== undefined &&
-      (!Number.isInteger(stock) || stock < 0)
-    ) {
-      return res.status(400).json({
-        message: "stock must be a non-negative integer",
-      });
-    }
-
-    // Check product exists
     const existingProduct = await db.orm.public.Products
-      .where({ id: productId })
+      .where({
+        id: productId,
+      })
       .first();
 
     if (!existingProduct) {
@@ -186,7 +123,6 @@ router.patch("/products/:id", async (req, res) => {
         message: "Product not found",
       });
     }
-
     const updateData: any = {};
 
     if (name !== undefined) {
@@ -197,16 +133,32 @@ router.patch("/products/:id", async (req, res) => {
       updateData.category = category;
     }
 
-    if (price !== undefined) {
-      updateData.price = String(price);
-    }
-
     if (stock !== undefined) {
+      if (!Number.isInteger(stock) || stock < 0) {
+        return res.status(400).json({
+          message: "stock must be a non-negative integer",
+        });
+      }
+
       updateData.stock = stock;
     }
 
+    if (price !== undefined) {
+      const numericPrice = Number(price);
+
+      if (Number.isNaN(numericPrice) || numericPrice < 0) {
+        return res.status(400).json({
+          message: "price must be a non-negative number",
+        });
+      }
+
+      updateData.price = String(numericPrice);
+    }
+
     const updatedProduct = await db.orm.public.Products
-      .where({ id: productId })
+      .where({
+        id: productId,
+      })
       .update(updateData);
 
     return res.json({
@@ -222,25 +174,20 @@ router.patch("/products/:id", async (req, res) => {
   }
 });
 
-// =====================================================
-// DELETE PRODUCT
-// DELETE /api/products/:id
-// =====================================================
-
 router.delete("/products/:id", async (req, res) => {
   try {
     const productId = Number(req.params.id);
 
-    // Validate product ID
     if (!Number.isInteger(productId)) {
       return res.status(400).json({
         message: "Invalid product ID",
       });
     }
 
-    // Check product exists
     const existingProduct = await db.orm.public.Products
-      .where({ id: productId })
+      .where({
+        id: productId,
+      })
       .first();
 
     if (!existingProduct) {
@@ -250,12 +197,13 @@ router.delete("/products/:id", async (req, res) => {
     }
 
     await db.orm.public.Products
-      .where({ id: productId })
+      .where({
+        id: productId,
+      })
       .delete();
 
     return res.json({
       message: "Product deleted successfully",
-      product: existingProduct,
     });
   } catch (error) {
     console.error("Failed to delete product:", error);
@@ -266,87 +214,129 @@ router.delete("/products/:id", async (req, res) => {
   }
 });
 
-// =====================================================
-// UPDATE PRODUCT STOCK
-// PATCH /api/products/:id/stock
-// =====================================================
-
 router.patch("/products/:id/stock", async (req, res) => {
   try {
     const productId = Number(req.params.id);
     const { change, managerId } = req.body;
 
-    // Validate product ID
+
     if (!Number.isInteger(productId)) {
       return res.status(400).json({
         message: "Invalid product ID",
       });
     }
 
-    // Validate stock change
     if (!Number.isInteger(change) || change === 0) {
       return res.status(400).json({
         message: "Change must be a non-zero integer",
       });
     }
 
-    // Validate manager ID
     if (!Number.isInteger(managerId)) {
       return res.status(400).json({
         message: "managerId must be an integer",
       });
     }
-
-    // Run stock update and inventory log inside one transaction
     const result = await db.transaction(async (tx) => {
-      // Read current product
+      // First check that the product exists.
       const product = await tx.orm.public.Products
-        .where({ id: productId })
+        .where({
+          id: productId,
+        })
         .first();
 
-      // Product does not exist
       if (!product) {
         const error = new Error("Product not found");
         error.name = "PRODUCT_NOT_FOUND";
         throw error;
       }
 
-      const oldStock = product.stock;
-      const newStock = oldStock + change;
+      /*
+       * ATOMIC STOCK UPDATE
+       *
+       * PostgreSQL performs:
+       *
+       *     stock = stock + change
+       *
+       * directly inside the UPDATE statement.
+       *
+       * The WHERE condition:
+       *
+       *     stock >= -change
+       *
+       * prevents the stock from becoming negative.
+       *
+       * Example:
+       *
+       * Current stock = 100
+       * Change = -30
+       *
+       * Condition:
+       *
+       * 100 >= 30  -> TRUE
+       *
+       * New stock:
+       *
+       * 100 + (-30) = 70
+       */
 
-      // Prevent negative stock
-      if (newStock < 0) {
+      const changeParam = param(change, {
+        codecId: "pg/int4@1",
+      });
+
+      const updatePlan = tx.sql.public.products
+        .update((f, fns) => ({
+          stock: fns.raw`${f.stock} + ${changeParam}`.returns(
+            "pg/int4@1"
+          ),
+        }))
+        .where((f, fns) =>
+          fns.and(
+            fns.eq(f.id, productId),
+            fns.gte(f.stock, -change)
+          )
+        )
+        .build();
+
+      /*
+       * IMPORTANT:
+       *
+       * In the Prisma RC version installed in your project,
+       * tx.execute() gives statement statistics.
+       *
+       * So we check affectedRows instead of trying to
+       * read updatedRows[0].
+       */
+
+      const updateStats = await tx.execute(updatePlan);
+
+      if (updateStats.affectedRows === 0) {
         const error = new Error("Stock cannot be negative");
         error.name = "NEGATIVE_STOCK";
         throw error;
       }
 
-      /*
-       * IMPORTANT:
-       * This is the current stock-update logic from your file.
-       * We will make this atomic/concurrency-safe separately
-       * so two simultaneous requests cannot overwrite each other.
-       */
-
+      // Read the updated product inside the SAME transaction.
       const updatedProduct = await tx.orm.public.Products
         .where({
           id: productId,
-          stock: oldStock,
         })
-        .update({
-          stock: newStock,
-        });
+        .first();
 
-      // Another request changed the stock first
       if (!updatedProduct) {
-        const error = new Error(
-          "Stock was changed by another request. Please try again."
-        );
-        error.name = "CONCURRENCY_CONFLICT";
+        const error = new Error("Product not found");
+        error.name = "PRODUCT_NOT_FOUND";
         throw error;
       }
 
-      // Create inventory log in same transaction
+      // Calculate the old stock from the new stock.
+      const newStock = updatedProduct.stock;
+      const oldStock = newStock - change;
+
+      // --------------------------------------------------
+      // CREATE INVENTORY LOG
+      // --------------------------------------------------
+
       const inventoryLog =
         await tx.orm.public.InventoryLogs.create({
           productId,
@@ -362,15 +352,20 @@ router.patch("/products/:id/stock", async (req, res) => {
       };
     });
 
+    // --------------------------------------------------
+    // SUCCESS RESPONSE
+    // --------------------------------------------------
+
     return res.json({
       message: "Stock updated successfully",
       product: result.product,
       inventoryLog: result.inventoryLog,
     });
+
   } catch (error) {
     console.error("Failed to update stock:", error);
 
-    // Product not found
+    // Product doesn't exist
     if (
       error instanceof Error &&
       error.name === "PRODUCT_NOT_FOUND"
@@ -380,7 +375,7 @@ router.patch("/products/:id/stock", async (req, res) => {
       });
     }
 
-    // Negative stock
+    // Stock would become negative
     if (
       error instanceof Error &&
       error.name === "NEGATIVE_STOCK"
@@ -390,22 +385,43 @@ router.patch("/products/:id/stock", async (req, res) => {
       });
     }
 
-    // Concurrency conflict
-    if (
-      error instanceof Error &&
-      error.name === "CONCURRENCY_CONFLICT"
-    ) {
-      return res.status(409).json({
-        message:
-          "Stock was changed by another request. Please try again.",
-      });
-    }
-
-    // Other database/server errors
+    // Unexpected server/database error
     return res.status(500).json({
       message: "Failed to update stock",
     });
   }
 });
+
+router.get("/inventory-logs", async (_req, res) => {
+  try {
+    const logs =
+      await db.orm.public.InventoryLogs.all();
+
+    res.json(logs);
+  } catch (error) {
+    console.error("Failed to fetch inventory logs:", error);
+
+    res.status(500).json({
+// ======================================================
+// GET INVENTORY LOGS
+// GET /api/inventory-logs
+// ======================================================
+
+router.get("/inventory-logs", async (_req, res) => {
+  try {
+    const logs = await db.orm.public.InventoryLogs.all();
+
+    return res.json({
+      logs,
+    });
+  } catch (error) {
+    console.error("Failed to fetch inventory logs:", error);
+
+    return res.status(500).json({
+      message: "Failed to fetch inventory logs",
+    });
+  }
+});
+
 
 export default router;
