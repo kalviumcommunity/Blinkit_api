@@ -131,9 +131,7 @@ thank you
 
 
 thank you so much
-thank you very much
-Thanks 
 
-Blinkit api 
+pr raised all
 
-connected backend with postgre 3
+my work completed
