@@ -2098,3 +2098,338 @@ td {
     grid-column: auto;
   }
 } 
+
+/* ========================================
+   BLINKIT THEME OVERRIDE
+======================================== */
+
+/* Main theme colors */
+:root {
+  --blinkit-green: #00a82d;
+  --blinkit-dark-green: #006b3c;
+  --blinkit-deep-green: #004d2a;
+  --blinkit-light-green: #eaf8ee;
+  --blinkit-yellow: #ffd600;
+  --blinkit-light-yellow: #fff8d8;
+  --blinkit-text: #17301f;
+  --blinkit-muted: #6f7d73;
+  --blinkit-border: #dce9df;
+  --blinkit-background: #f6faf7;
+}
+
+/* Overall page */
+body {
+  background: var(--blinkit-background);
+  color: var(--blinkit-text);
+}
+
+/* ========================================
+   SIDEBAR
+======================================== */
+
+.sidebar {
+  background: var(--blinkit-deep-green);
+}
+
+.brand-logo {
+  color: var(--blinkit-yellow);
+}
+
+.brand span {
+  color: #b8d8c2;
+}
+
+.nav-title {
+  color: #78a98b;
+}
+
+.nav-item {
+  color: #c9dfd0;
+}
+
+.nav-item:hover {
+  background: rgba(0, 168, 45, 0.18);
+}
+
+.nav-item.active {
+  background: var(--blinkit-green);
+  color: white;
+}
+
+.collapse-button {
+  color: #8fb9a0;
+}
+
+/* ========================================
+   MAIN CONTENT
+======================================== */
+
+.main-content {
+  background: var(--blinkit-background);
+}
+
+/* ========================================
+   HEADER
+======================================== */
+
+.top-header h1,
+.products-header h1,
+.categories-header h1,
+.stock-update-header h1 {
+  color: var(--blinkit-dark-green);
+}
+
+.top-header p,
+.products-header p,
+.categories-header p,
+.stock-update-header p {
+  color: var(--blinkit-muted);
+}
+
+/* ========================================
+   BUTTONS
+======================================== */
+
+.export-button {
+  background: var(--blinkit-green);
+  border-color: var(--blinkit-green);
+}
+
+.export-button:hover {
+  background: #008f27;
+}
+
+.products-refresh:hover {
+  border-color: var(--blinkit-green);
+  color: var(--blinkit-dark-green);
+  background: var(--blinkit-light-green);
+}
+
+/* ========================================
+   STAT CARDS
+======================================== */
+
+.stat-card {
+  border-color: var(--blinkit-border);
+}
+
+.stat-icon.green {
+  background: var(--blinkit-light-green);
+  color: var(--blinkit-green);
+}
+
+.stat-icon.yellow {
+  background: var(--blinkit-light-yellow);
+  color: #c79f00;
+}
+
+.positive {
+  color: var(--blinkit-green);
+}
+
+.warning-text {
+  color: #c79a00;
+}
+
+/* ========================================
+   PANELS
+======================================== */
+
+.panel {
+  border-color: var(--blinkit-border);
+}
+
+.view-link {
+  color: var(--blinkit-green);
+}
+
+/* ========================================
+   CHART
+======================================== */
+
+.stock-chart {
+  color: var(--blinkit-green);
+}
+
+.stock-chart circle {
+  fill: var(--blinkit-green);
+}
+
+/* ========================================
+   ACTIVITIES
+======================================== */
+
+.activity-avatar {
+  background: var(--blinkit-light-green);
+  color: var(--blinkit-green);
+}
+
+/* ========================================
+   INVENTORY STATUS
+======================================== */
+
+.status.healthy {
+  background: var(--blinkit-light-green);
+  color: var(--blinkit-dark-green);
+}
+
+.status.low {
+  background: var(--blinkit-light-yellow);
+  color: #a77f00;
+}
+
+/* ========================================
+   QUICK ACTIONS
+======================================== */
+
+.quick-buttons button:hover {
+  border-color: #9bd5ae;
+  background: var(--blinkit-light-green);
+}
+
+.quick-buttons span {
+  color: var(--blinkit-green);
+}
+
+/* ========================================
+   PRODUCTS
+======================================== */
+
+.products-search:focus-within,
+.products-category:focus {
+  border-color: var(--blinkit-green);
+  box-shadow: 0 0 0 3px rgba(0, 168, 45, 0.1);
+}
+
+.product-card:hover {
+  border-color: #a8d9b7;
+  box-shadow: 0 8px 22px rgba(0, 107, 60, 0.09);
+}
+
+.product-card-top .product-emoji {
+  background: var(--blinkit-light-green);
+}
+
+.stock-button.increase {
+  background: var(--blinkit-green);
+  border-color: var(--blinkit-green);
+}
+
+.stock-button.increase:hover:not(:disabled) {
+  background: #008f27;
+}
+
+.stock-button.decrease:hover:not(:disabled) {
+  background: #fff8f8;
+  border-color: #c7cfcb;
+}
+
+/* ========================================
+   PRODUCT SUCCESS MESSAGE
+======================================== */
+
+.products-success {
+  background: var(--blinkit-light-green);
+  border-color: #bfe5ca;
+  color: var(--blinkit-dark-green);
+}
+
+/* ========================================
+   CATEGORIES
+======================================== */
+
+.categories-count span {
+  color: var(--blinkit-green);
+}
+
+.category-card:hover {
+  border-color: #a8d9b7;
+  box-shadow: 0 8px 24px rgba(0, 107, 60, 0.09);
+}
+
+.category-icon {
+  background: var(--blinkit-light-green);
+}
+
+.category-stock-bar div {
+  background: var(--blinkit-green);
+}
+
+/* ========================================
+   STOCK UPDATE
+======================================== */
+
+.stock-update-count span {
+  color: var(--blinkit-green);
+}
+
+.stock-update-info {
+  background: var(--blinkit-light-green);
+  border-color: #c8e8d2;
+  color: var(--blinkit-dark-green);
+}
+
+.stock-update-card:hover {
+  border-color: #a8d9b7;
+  box-shadow: 0 8px 24px rgba(0, 107, 60, 0.09);
+}
+
+.stock-product-icon {
+  background: var(--blinkit-light-green);
+}
+
+.stock-label.healthy {
+  color: var(--blinkit-green);
+}
+
+.stock-control-row input:focus {
+  border-color: var(--blinkit-green);
+  box-shadow: 0 0 0 3px rgba(0, 168, 45, 0.1);
+}
+
+.stock-increase {
+  background: var(--blinkit-green);
+}
+
+.stock-increase:hover {
+  background: #008f27;
+}
+
+/* ========================================
+   SMALL YELLOW ACCENTS
+======================================== */
+
+.stat-icon.yellow {
+  background: var(--blinkit-light-yellow);
+}
+
+.category-arrow {
+  color: var(--blinkit-green);
+}
+
+/* ========================================
+   TABLE HIGHLIGHTS
+======================================== */
+
+th {
+  background: #f4faf5;
+}
+
+.update-button {
+  background: var(--blinkit-light-green);
+  color: var(--blinkit-dark-green);
+  border-color: #c8e8d2;
+}
+
+.update-button:hover {
+  background: #d9f2e1;
+}
+
+/* ========================================
+   PROFILE
+======================================== */
+
+.profile-avatar {
+  background: var(--blinkit-yellow);
+  color: var(--blinkit-deep-green);
+}
