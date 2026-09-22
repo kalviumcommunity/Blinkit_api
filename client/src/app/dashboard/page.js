@@ -1,937 +1,986 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { getProducts, updateStock } from "../../lib/api";
+import { getProducts, getInventoryLogs, updateStock } from "../../lib/api";
 
 export default function Dashboard() {
   const [products, setProducts] = useState([]);
+  const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState(null);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    loadProducts();
+    loadDashboard();
   }, []);
 
-  async function loadProducts() {
+  async function loadDashboard() {
     try {
       setLoading(true);
 
-      const data = await getProducts();
+      const [productsData, logsData] = await Promise.all([
+        getProducts(),
+        getInventoryLogs(),
+      ]);
 
-      setProducts(data);
+      setProducts(productsData);
+      setLogs(logsData);
     } catch (error) {
-      console.error("Failed to load products:", error);
+      console.error(error);
+      setMessage(error.message);
     } finally {
       setLoading(false);
     }
   }
 
-  async function changeStock(id, change) {
+  async function changeStock(productId, change) {
     const oldProducts = [...products];
 
-    const product = products.find((p) => p.id === id);
+    // Prevent negative stock in UI
+    const product = products.find((p) => p.id === productId);
 
     if (!product) return;
 
-    // Negative stock prevent
     if (product.stock + change < 0) {
       setMessage("Stock cannot be negative.");
-      setTimeout(() => setMessage(""), 2500);
       return;
     }
 
     // Optimistic update
-    setProducts((currentProducts) =>
-      currentProducts.map((p) =>
-        p.id === id
-          ? {
-              ...p,
-              stock: p.stock + change,
-            }
+    setProducts((current) =>
+      current.map((p) =>
+        p.id === productId
+          ? { ...p, stock: p.stock + change }
           : p
       )
     );
 
-    setUpdatingId(id);
+    setUpdatingId(productId);
     setMessage("");
 
     try {
-      const result = await updateStock(id, change);
+      const result = await updateStock(productId, change);
 
-      // Backend ka actual result
-      setProducts((currentProducts) =>
-        currentProducts.map((p) =>
-          p.id === id ? result.product : p
+      // Use actual database response
+      setProducts((current) =>
+        current.map((p) =>
+          p.id === productId ? result.product : p
         )
       );
 
+      // Reload logs so dashboard stays current
+      const updatedLogs = await getInventoryLogs();
+      setLogs(updatedLogs);
+
       setMessage(
-        `${product.name} stock ${
-          change > 0 ? "increased" : "decreased"
-        } by ${Math.abs(change)}`
+        `${result.product.name} stock updated successfully.`
       );
-
-      setTimeout(() => {
-        setMessage("");
-      }, 2500);
     } catch (error) {
-      console.error("Stock update failed:", error);
+      console.error(error);
 
-      // Rollback
+      // Rollback optimistic update
       setProducts(oldProducts);
 
-      setMessage(
-        error.message || "Stock update failed"
-      );
-
-      setTimeout(() => {
-        setMessage("");
-      }, 3000);
+      setMessage(error.message);
     } finally {
       setUpdatingId(null);
     }
   }
 
-  // -----------------------------
-  // Dashboard Statistics
-  // -----------------------------
-
   const totalProducts = products.length;
 
   const totalStock = products.reduce(
-    (total, product) =>
-      total + Number(product.stock || 0),
+    (total, product) => total + Number(product.stock || 0),
     0
   );
 
-  const lowStockItems = products.filter(
-    (product) =>
-      Number(product.stock) > 0 &&
-      Number(product.stock) <= 20
-  ).length;
+  const lowStockProducts = products.filter(
+    (product) => product.stock > 0 && product.stock <= 10
+  );
 
-  const outOfStockItems = products.filter(
-    (product) => Number(product.stock) === 0
-  ).length;
+  const outOfStockProducts = products.filter(
+    (product) => product.stock === 0
+  );
 
-  // Categories
-  const categories = [
-    ...new Set(products.map((product) => product.category)),
-  ];
+  /*
+   * Last 7 stock movements.
+   * Positive changes = increased
+   * Negative changes = decreased
+   */
+  const movementData = useMemo(() => {
+    const days = [];
+
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+
+      const key = date.toISOString().slice(0, 10);
+
+      days.push({
+        key,
+        label: date.toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+        }),
+        increased: 0,
+        decreased: 0,
+      });
+    }
+
+    logs.forEach((log) => {
+      if (!log.createdAt) return;
+
+      const date = new Date(log.createdAt);
+      const key = date.toISOString().slice(0, 10);
+
+      const day = days.find((item) => item.key === key);
+
+      if (!day) return;
+
+      if (Number(log.change) > 0) {
+        day.increased += Number(log.change);
+      } else {
+        day.decreased += Math.abs(Number(log.change));
+      }
+    });
+
+    return days;
+  }, [logs]);
+
+  const maxMovement = Math.max(
+    1,
+    ...movementData.map((day) =>
+      Math.max(day.increased, day.decreased)
+    )
+  );
 
   if (loading) {
     return (
-      <div className="dashboard-loading">
-        Loading Inventory...
-      </div>
+      <main style={styles.loading}>
+        <h2>Loading inventory...</h2>
+      </main>
     );
   }
 
   return (
-    <div className="dashboard-layout">
+    <div style={styles.app}>
+      {/* Sidebar */}
+      <aside style={styles.sidebar}>
+        <div>
+          <div style={styles.logo}>
+            blink<span>it</span>
+          </div>
 
-      {/* =========================
-          SIDEBAR
-      ========================== */}
-
-      <aside className="sidebar">
-
-        <div className="logo">
-          blinkit
-          <span>Inventory Manager</span>
+          <div style={styles.subtitle}>
+            Inventory Manager
+          </div>
         </div>
 
-        <div className="menu-section">
-          <p>MAIN</p>
-
+        <nav style={styles.nav}>
           <Link
             href="/dashboard"
-            className="menu-item active"
+            style={{
+              ...styles.navItem,
+              ...styles.activeNavItem,
+            }}
           >
-            ▣ Dashboard
-          </Link>
-        </div>
-
-        <div className="menu-section">
-          <p>INVENTORY</p>
-
-          <Link
-            href="/products"
-            className="menu-item"
-          >
-            ▤ Products
+            Dashboard
           </Link>
 
-          <Link
-            href="/stock-update"
-            className="menu-item"
-          >
-            ↕ Stock Update
+          <Link href="/products" style={styles.navItem}>
+            All Stocks
           </Link>
 
-          <Link
-            href="/categories"
-            className="menu-item"
-          >
-            ▣ Categories
+          <Link href="/stock-update" style={styles.navItem}>
+            Update Stock
           </Link>
-        </div>
-
-        <div className="menu-section">
-          <p>AUDIT & REPORTS</p>
 
           <Link
             href="/inventory-logs"
-            className="menu-item"
+            style={styles.navItem}
           >
-            ▤ Inventory Logs
+            Inventory Logs
           </Link>
-        </div>
 
-      </aside>
+          <Link href="/categories" style={styles.navItem}>
+            Categories
+          </Link>
+        </nav>
 
-      {/* =========================
-          MAIN CONTENT
-      ========================== */}
-
-      <main className="dashboard-main">
-
-        {/* Header */}
-
-        <div className="top-header">
+        <div style={styles.managerBox}>
+          <div style={styles.avatar}>M</div>
 
           <div>
-            <h1>Dashboard</h1>
+            <strong>Manager</strong>
+            <div style={styles.managerEmail}>
+              manager@blinkit.com
+            </div>
+          </div>
+        </div>
+      </aside>
 
-            <p>
-              Overview of your inventory and stock
-              activities
+      {/* Main content */}
+      <main style={styles.main}>
+        {/* Header */}
+        <header style={styles.header}>
+          <div>
+            <h1 style={styles.heading}>
+              Inventory Overview
+            </h1>
+
+            <p style={styles.description}>
+              Overview of inventory and stock movement
             </p>
           </div>
 
           <button
-            className="refresh-button"
-            onClick={loadProducts}
+            onClick={loadDashboard}
+            style={styles.refreshButton}
           >
             ↻ Refresh
           </button>
-
-        </div>
+        </header>
 
         {/* Message */}
-
         {message && (
-          <div className="message">
+          <div style={styles.message}>
             {message}
           </div>
         )}
 
-        {/* =========================
-            STAT CARDS
-        ========================== */}
+        {/* Summary cards */}
+        <section style={styles.cards}>
+          <SummaryCard
+            title="Total Products"
+            value={totalProducts}
+            description="products"
+          />
 
-        <div className="stats-grid">
+          <SummaryCard
+            title="Total Stock"
+            value={totalStock.toLocaleString()}
+            description="units"
+          />
 
-          <div className="stat-card">
-            <div className="stat-top">
-              <span>Total Products</span>
-              <div className="stat-icon">
-                ▣
-              </div>
-            </div>
+          <SummaryCard
+            title="Low Stock Items"
+            value={lowStockProducts.length}
+            description="products"
+          />
 
-            <h2>{totalProducts}</h2>
+          <SummaryCard
+            title="Out of Stock"
+            value={outOfStockProducts.length}
+            description="products"
+          />
+        </section>
 
-            <p className="green-text">
-              Products in inventory
-            </p>
-          </div>
+        {/* Movement + quick info */}
+        <section style={styles.middleGrid}>
+          <div style={styles.panel}>
+            <div style={styles.panelHeader}>
+              <div>
+                <h2 style={styles.panelTitle}>
+                  Stock Movement
+                </h2>
 
-          <div className="stat-card">
-            <div className="stat-top">
-              <span>Total Stock</span>
-              <div className="stat-icon blue">
-                ▤
-              </div>
-            </div>
-
-            <h2>{totalStock}</h2>
-
-            <p className="green-text">
-              Units available
-            </p>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-top">
-              <span>Low Stock Items</span>
-              <div className="stat-icon yellow">
-                ⚠
-              </div>
-            </div>
-
-            <h2>{lowStockItems}</h2>
-
-            <p className="yellow-text">
-              Items need attention
-            </p>
-          </div>
-
-          <div className="stat-card">
-            <div className="stat-top">
-              <span>Stock Out Items</span>
-              <div className="stat-icon purple">
-                □
-              </div>
-            </div>
-
-            <h2>{outOfStockItems}</h2>
-
-            <p className="red-text">
-              Items are out of stock
-            </p>
-          </div>
-
-        </div>
-
-        {/* =========================
-            PRODUCTS SECTION
-        ========================== */}
-
-        <div className="section-header">
-
-          <div>
-            <h2>Current Inventory</h2>
-
-            <p>
-              Update stock directly from the
-              dashboard
-            </p>
-          </div>
-
-          <Link
-            href="/products"
-            className="view-all"
-          >
-            View All →
-          </Link>
-
-        </div>
-
-        <div className="products-grid">
-
-          {products.map((product) => {
-
-            const stock = Number(product.stock);
-
-            let status = "In Stock";
-
-            if (stock === 0) {
-              status = "Out of Stock";
-            } else if (stock <= 20) {
-              status = "Low Stock";
-            }
-
-            return (
-              <div
-                className="product-card"
-                key={product.id}
-              >
-
-                <div className="product-header">
-
-                  <div>
-                    <h3>
-                      {product.name}
-                    </h3>
-
-                    <p>
-                      {product.category}
-                    </p>
-                  </div>
-
-                  <span
-                    className={
-                      stock === 0
-                        ? "status out"
-                        : stock <= 20
-                        ? "status low"
-                        : "status good"
-                    }
-                  >
-                    {status}
-                  </span>
-
-                </div>
-
-                <div className="product-info">
-
-                  <div>
-                    <span>Price</span>
-                    <strong>
-                      ₹{product.price}
-                    </strong>
-                  </div>
-
-                  <div>
-                    <span>Current Stock</span>
-                    <strong className="stock-number">
-                      {stock}
-                    </strong>
-                  </div>
-
-                </div>
-
-                {/* Stock Buttons */}
-
-                <div className="stock-buttons">
-
-                  <button
-                    disabled={
-                      updatingId === product.id ||
-                      stock === 0
-                    }
-                    onClick={() =>
-                      changeStock(
-                        product.id,
-                        -10
-                      )
-                    }
-                  >
-                    −10
-                  </button>
-
-                  <button
-                    disabled={
-                      updatingId === product.id
-                    }
-                    onClick={() =>
-                      changeStock(
-                        product.id,
-                        10
-                      )
-                    }
-                  >
-                    {updatingId === product.id
-                      ? "Updating..."
-                      : "+10"}
-                  </button>
-
-                </div>
-
-              </div>
-            );
-          })}
-
-        </div>
-
-        {/* =========================
-            CATEGORIES
-        ========================== */}
-
-        <div className="section-header category-heading">
-
-          <div>
-            <h2>Categories</h2>
-
-            <p>
-              Product categories in inventory
-            </p>
-          </div>
-
-          <Link
-            href="/categories"
-            className="view-all"
-          >
-            Manage Categories →
-          </Link>
-
-        </div>
-
-        <div className="categories-grid">
-
-          {categories.map((category) => {
-
-            const categoryProducts =
-              products.filter(
-                (product) =>
-                  product.category === category
-              );
-
-            const categoryStock =
-              categoryProducts.reduce(
-                (total, product) =>
-                  total +
-                  Number(product.stock || 0),
-                0
-              );
-
-            return (
-              <div
-                className="category-card"
-                key={category}
-              >
-                <h3>{category}</h3>
-
-                <p>
-                  {categoryProducts.length} product
-                  {categoryProducts.length !== 1
-                    ? "s"
-                    : ""}
+                <p style={styles.panelDescription}>
+                  Last 7 days
                 </p>
-
-                <strong>
-                  {categoryStock} units
-                </strong>
               </div>
-            );
-          })}
 
-        </div>
+              <div style={styles.legend}>
+                <span>
+                  <i
+                    style={{
+                      ...styles.legendDot,
+                      background: "#159447",
+                    }}
+                  />
+                  Increased
+                </span>
 
+                <span>
+                  <i
+                    style={{
+                      ...styles.legendDot,
+                      background: "#dc2626",
+                    }}
+                  />
+                  Decreased
+                </span>
+              </div>
+            </div>
+
+            <div style={styles.chart}>
+              {movementData.map((day) => (
+                <div
+                  key={day.key}
+                  style={styles.chartColumn}
+                >
+                  <div style={styles.bars}>
+                    <div
+                      title={`Increased: ${day.increased}`}
+                      style={{
+                        ...styles.bar,
+                        height: `${Math.max(
+                          4,
+                          (day.increased / maxMovement) * 140
+                        )}px`,
+                        background: "#159447",
+                      }}
+                    />
+
+                    <div
+                      title={`Decreased: ${day.decreased}`}
+                      style={{
+                        ...styles.bar,
+                        height: `${Math.max(
+                          4,
+                          (day.decreased / maxMovement) * 140
+                        )}px`,
+                        background: "#dc2626",
+                      }}
+                    />
+                  </div>
+
+                  <span style={styles.chartLabel}>
+                    {day.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={styles.panel}>
+            <h2 style={styles.panelTitle}>
+              Quick Summary
+            </h2>
+
+            <div style={styles.summaryList}>
+              <div style={styles.summaryRow}>
+                <span>Recent stock changes</span>
+                <strong>{logs.length}</strong>
+              </div>
+
+              <div style={styles.summaryRow}>
+                <span>Low stock products</span>
+                <strong>{lowStockProducts.length}</strong>
+              </div>
+
+              <div style={styles.summaryRow}>
+                <span>Out of stock</span>
+                <strong>{outOfStockProducts.length}</strong>
+              </div>
+
+              <div style={styles.summaryRow}>
+                <span>Total units</span>
+                <strong>{totalStock}</strong>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Low stock table */}
+        <section style={styles.panel}>
+          <div style={styles.panelHeader}>
+            <div>
+              <h2 style={styles.panelTitle}>
+                Top Low Stock Products
+              </h2>
+
+              <p style={styles.panelDescription}>
+                Products that need attention
+              </p>
+            </div>
+
+            <Link
+              href="/products"
+              style={styles.viewAll}
+            >
+              View all →
+            </Link>
+          </div>
+
+          {lowStockProducts.length === 0 ? (
+            <div style={styles.empty}>
+              No low stock products.
+            </div>
+          ) : (
+            <div style={styles.tableWrapper}>
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>#</th>
+                    <th style={styles.th}>Product</th>
+                    <th style={styles.th}>Category</th>
+                    <th style={styles.th}>Current Stock</th>
+                    <th style={styles.th}>Status</th>
+                    <th style={styles.th}>Update</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {lowStockProducts
+                    .slice(0, 5)
+                    .map((product, index) => (
+                      <tr key={product.id}>
+                        <td style={styles.td}>
+                          {index + 1}
+                        </td>
+
+                        <td style={styles.td}>
+                          <strong>
+                            {product.name}
+                          </strong>
+                        </td>
+
+                        <td style={styles.td}>
+                          {product.category}
+                        </td>
+
+                        <td
+                          style={{
+                            ...styles.td,
+                            fontWeight: "700",
+                            color:
+                              product.stock === 0
+                                ? "#dc2626"
+                                : "#e87500",
+                          }}
+                        >
+                          {product.stock} units
+                        </td>
+
+                        <td style={styles.td}>
+                          <span
+                            style={{
+                              ...styles.badge,
+                              background:
+                                product.stock === 0
+                                  ? "#fee2e2"
+                                  : "#fff0dc",
+                              color:
+                                product.stock === 0
+                                  ? "#dc2626"
+                                  : "#e87500",
+                            }}
+                          >
+                            {product.stock === 0
+                              ? "Out of Stock"
+                              : "Low Stock"}
+                          </span>
+                        </td>
+
+                        <td style={styles.td}>
+                          <button
+                            disabled={
+                              updatingId === product.id
+                            }
+                            onClick={() =>
+                              changeStock(
+                                product.id,
+                                10
+                              )
+                            }
+                            style={styles.updateButton}
+                          >
+                            +10
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        {/* All products */}
+        <section style={styles.panel}>
+          <div style={styles.panelHeader}>
+            <div>
+              <h2 style={styles.panelTitle}>
+                All Products
+              </h2>
+
+              <p style={styles.panelDescription}>
+                Update stock directly
+              </p>
+            </div>
+          </div>
+
+          <div style={styles.tableWrapper}>
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>Product</th>
+                  <th style={styles.th}>Category</th>
+                  <th style={styles.th}>Price</th>
+                  <th style={styles.th}>Stock</th>
+                  <th style={styles.th}>Actions</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {products.map((product) => (
+                  <tr key={product.id}>
+                    <td style={styles.td}>
+                      <strong>{product.name}</strong>
+                    </td>
+
+                    <td style={styles.td}>
+                      {product.category}
+                    </td>
+
+                    <td style={styles.td}>
+                      ₹{product.price}
+                    </td>
+
+                    <td style={styles.td}>
+                      <strong>{product.stock}</strong>
+                    </td>
+
+                    <td style={styles.td}>
+                      <button
+                        disabled={
+                          updatingId === product.id ||
+                          product.stock <= 0
+                        }
+                        onClick={() =>
+                          changeStock(
+                            product.id,
+                            -1
+                          )
+                        }
+                        style={styles.stockButton}
+                      >
+                        −1
+                      </button>
+
+                      <button
+                        disabled={
+                          updatingId === product.id
+                        }
+                        onClick={() =>
+                          changeStock(
+                            product.id,
+                            1
+                          )
+                        }
+                        style={styles.stockButton}
+                      >
+                        +1
+                      </button>
+
+                      <button
+                        disabled={
+                          updatingId === product.id ||
+                          product.stock < 10
+                        }
+                        onClick={() =>
+                          changeStock(
+                            product.id,
+                            -10
+                          )
+                        }
+                        style={styles.stockButton}
+                      >
+                        −10
+                      </button>
+
+                      <button
+                        disabled={
+                          updatingId === product.id
+                        }
+                        onClick={() =>
+                          changeStock(
+                            product.id,
+                            10
+                          )
+                        }
+                        style={styles.stockButton}
+                      >
+                        +10
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </main>
-
-      {/* =========================
-          STYLES
-      ========================== */}
-
-      <style jsx>{`
-
-        * {
-          box-sizing: border-box;
-        }
-
-        .dashboard-layout {
-          min-height: 100vh;
-          display: flex;
-          background: #f7f9f8;
-          color: #1f2937;
-        }
-
-        /* SIDEBAR */
-
-        .sidebar {
-          width: 250px;
-          min-height: 100vh;
-          background: #064e3b;
-          color: white;
-          padding: 28px 18px;
-          position: sticky;
-          top: 0;
-          height: 100vh;
-        }
-
-        .logo {
-          font-size: 30px;
-          font-weight: 800;
-          margin-bottom: 35px;
-          padding-left: 12px;
-        }
-
-        .logo span {
-          display: block;
-          font-size: 12px;
-          font-weight: 400;
-          margin-top: 4px;
-          opacity: 0.8;
-        }
-
-        .menu-section {
-          margin-bottom: 28px;
-        }
-
-        .menu-section p {
-          font-size: 10px;
-          letter-spacing: 1.5px;
-          color: #9ad5bf;
-          margin: 0 12px 10px;
-          font-weight: 700;
-        }
-
-        .menu-item {
-          display: block;
-          padding: 12px 14px;
-          margin: 5px 0;
-          border-radius: 7px;
-          color: #d7f5e9;
-          text-decoration: none;
-          font-size: 14px;
-          transition: 0.2s;
-        }
-
-        .menu-item:hover {
-          background: #087f5b;
-          color: white;
-        }
-
-        .menu-item.active {
-          background: #087f5b;
-          color: white;
-          font-weight: 600;
-        }
-
-        /* MAIN */
-
-        .dashboard-main {
-          flex: 1;
-          padding: 38px;
-          overflow-x: hidden;
-        }
-
-        .top-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 28px;
-        }
-
-        .top-header h1 {
-          margin: 0;
-          font-size: 28px;
-        }
-
-        .top-header p {
-          margin-top: 7px;
-          color: #6b7280;
-        }
-
-        .refresh-button {
-          background: #087f5b;
-          color: white;
-          border: none;
-          border-radius: 8px;
-          padding: 11px 18px;
-          cursor: pointer;
-          font-weight: 600;
-        }
-
-        .refresh-button:hover {
-          background: #056b4c;
-        }
-
-        .message {
-          background: #e8f7ef;
-          color: #087f5b;
-          border: 1px solid #b7e5ce;
-          padding: 12px 16px;
-          border-radius: 8px;
-          margin-bottom: 20px;
-        }
-
-        /* STATS */
-
-        .stats-grid {
-          display: grid;
-          grid-template-columns:
-            repeat(4, minmax(0, 1fr));
-          gap: 18px;
-          margin-bottom: 35px;
-        }
-
-        .stat-card {
-          background: white;
-          border: 1px solid #e5e7eb;
-          border-radius: 12px;
-          padding: 20px;
-        }
-
-        .stat-top {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          color: #6b7280;
-          font-size: 13px;
-        }
-
-        .stat-icon {
-          width: 34px;
-          height: 34px;
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #dcfce7;
-          color: #087f5b;
-        }
-
-        .stat-icon.blue {
-          background: #dbeafe;
-          color: #2563eb;
-        }
-
-        .stat-icon.yellow {
-          background: #fef3c7;
-          color: #d97706;
-        }
-
-        .stat-icon.purple {
-          background: #ede9fe;
-          color: #7c3aed;
-        }
-
-        .stat-card h2 {
-          margin: 15px 0 5px;
-          font-size: 28px;
-          color: #111827;
-        }
-
-        .stat-card p {
-          margin: 0;
-          font-size: 12px;
-        }
-
-        .green-text {
-          color: #087f5b;
-        }
-
-        .yellow-text {
-          color: #d97706;
-        }
-
-        .red-text {
-          color: #dc2626;
-        }
-
-        /* SECTION */
-
-        .section-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 18px;
-        }
-
-        .section-header h2 {
-          margin: 0;
-          font-size: 20px;
-        }
-
-        .section-header p {
-          margin: 5px 0 0;
-          color: #6b7280;
-          font-size: 13px;
-        }
-
-        .view-all {
-          color: #087f5b;
-          text-decoration: none;
-          font-size: 13px;
-          font-weight: 600;
-        }
-
-        /* PRODUCTS */
-
-        .products-grid {
-          display: grid;
-          grid-template-columns:
-            repeat(2, minmax(0, 1fr));
-          gap: 18px;
-        }
-
-        .product-card {
-          background: white;
-          border: 1px solid #e5e7eb;
-          border-radius: 12px;
-          padding: 20px;
-        }
-
-        .product-header {
-          display: flex;
-          justify-content: space-between;
-          gap: 15px;
-        }
-
-        .product-header h3 {
-          margin: 0;
-          font-size: 17px;
-        }
-
-        .product-header p {
-          margin: 5px 0 0;
-          color: #6b7280;
-          font-size: 13px;
-        }
-
-        .status {
-          height: fit-content;
-          padding: 5px 9px;
-          border-radius: 20px;
-          font-size: 11px;
-          font-weight: 600;
-        }
-
-        .status.good {
-          background: #dcfce7;
-          color: #15803d;
-        }
-
-        .status.low {
-          background: #fef3c7;
-          color: #b45309;
-        }
-
-        .status.out {
-          background: #fee2e2;
-          color: #dc2626;
-        }
-
-        .product-info {
-          display: flex;
-          gap: 60px;
-          margin: 22px 0;
-        }
-
-        .product-info span {
-          display: block;
-          color: #6b7280;
-          font-size: 12px;
-          margin-bottom: 5px;
-        }
-
-        .product-info strong {
-          font-size: 15px;
-        }
-
-        .stock-number {
-          color: #087f5b;
-        }
-
-        .stock-buttons {
-          display: flex;
-          gap: 10px;
-        }
-
-        .stock-buttons button {
-          flex: 1;
-          padding: 10px;
-          border: 1px solid #d1d5db;
-          background: white;
-          border-radius: 7px;
-          cursor: pointer;
-          font-weight: 600;
-        }
-
-        .stock-buttons button:last-child {
-          background: #087f5b;
-          color: white;
-          border-color: #087f5b;
-        }
-
-        .stock-buttons button:hover:not(:disabled) {
-          opacity: 0.85;
-        }
-
-        .stock-buttons button:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-
-        /* CATEGORIES */
-
-        .category-heading {
-          margin-top: 35px;
-        }
-
-        .categories-grid {
-          display: grid;
-          grid-template-columns:
-            repeat(4, minmax(0, 1fr));
-          gap: 15px;
-        }
-
-        .category-card {
-          background: white;
-          border: 1px solid #e5e7eb;
-          border-radius: 10px;
-          padding: 18px;
-        }
-
-        .category-card h3 {
-          margin: 0;
-        }
-
-        .category-card p {
-          color: #6b7280;
-          font-size: 13px;
-        }
-
-        .category-card strong {
-          color: #087f5b;
-        }
-
-        .dashboard-loading {
-          padding: 50px;
-          font-size: 20px;
-        }
-
-        /* MOBILE */
-
-        @media (max-width: 900px) {
-
-          .sidebar {
-            width: 210px;
-          }
-
-          .dashboard-main {
-            padding: 25px;
-          }
-
-          .stats-grid {
-            grid-template-columns:
-              repeat(2, 1fr);
-          }
-
-          .products-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .categories-grid {
-            grid-template-columns:
-              repeat(2, 1fr);
-          }
-        }
-
-        @media (max-width: 600px) {
-
-          .dashboard-layout {
-            display: block;
-          }
-
-          .sidebar {
-            position: relative;
-            width: 100%;
-            height: auto;
-            min-height: auto;
-          }
-
-          .menu-section {
-            display: inline-block;
-            vertical-align: top;
-            margin-right: 15px;
-          }
-
-          .stats-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .categories-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .top-header {
-            display: block;
-          }
-
-          .refresh-button {
-            margin-top: 15px;
-          }
-
-        }
-
-      `}</style>
-
     </div>
   );
 }
+
+
+/* ---------------- Components ---------------- */
+
+function SummaryCard({
+  title,
+  value,
+  description,
+}) {
+  return (
+    <div style={styles.card}>
+      <p style={styles.cardTitle}>{title}</p>
+
+      <strong style={styles.cardValue}>
+        {value}
+      </strong>
+
+      <span style={styles.cardDescription}>
+        {description}
+      </span>
+    </div>
+  );
+}
+
+
+/* ---------------- Styles ---------------- */
+
+const styles = {
+  app: {
+    minHeight: "100vh",
+    display: "flex",
+    background: "#f7f8f7",
+    color: "#172033",
+    fontFamily:
+      "Arial, Helvetica, sans-serif",
+  },
+
+  sidebar: {
+    width: "235px",
+    minHeight: "100vh",
+    background: "#ffffff",
+    borderRight: "1px solid #e5e7eb",
+    padding: "28px 18px",
+    display: "flex",
+    flexDirection: "column",
+    boxSizing: "border-box",
+    position: "sticky",
+    top: 0,
+    alignSelf: "flex-start",
+  },
+
+  logo: {
+    fontSize: "36px",
+    fontWeight: "800",
+    letterSpacing: "-2px",
+  },
+
+  subtitle: {
+    marginTop: "4px",
+    color: "#687184",
+    fontSize: "14px",
+  },
+
+  nav: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+    marginTop: "45px",
+  },
+
+  navItem: {
+    padding: "12px 14px",
+    borderRadius: "8px",
+    color: "#303846",
+    textDecoration: "none",
+    fontSize: "15px",
+    fontWeight: "600",
+  },
+
+  activeNavItem: {
+    background: "#e9f7ed",
+    color: "#168b45",
+  },
+
+  managerBox: {
+    marginTop: "auto",
+    paddingTop: "20px",
+    borderTop: "1px solid #e5e7eb",
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    fontSize: "14px",
+  },
+
+  avatar: {
+    width: "38px",
+    height: "38px",
+    borderRadius: "50%",
+    background: "#159447",
+    color: "#ffffff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: "700",
+  },
+
+  managerEmail: {
+    marginTop: "3px",
+    color: "#7b8494",
+    fontSize: "11px",
+  },
+
+  main: {
+    flex: 1,
+    padding: "32px",
+    maxWidth: "1500px",
+    margin: "0 auto",
+    boxSizing: "border-box",
+  },
+
+  header: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: "26px",
+  },
+
+  heading: {
+    margin: 0,
+    fontSize: "30px",
+    letterSpacing: "-0.5px",
+  },
+
+  description: {
+    margin: "7px 0 0",
+    color: "#697386",
+    fontSize: "15px",
+  },
+
+  refreshButton: {
+    border: "1px solid #d8dce2",
+    background: "#ffffff",
+    borderRadius: "8px",
+    padding: "10px 16px",
+    cursor: "pointer",
+    fontWeight: "600",
+  },
+
+  message: {
+    marginBottom: "20px",
+    padding: "12px 16px",
+    background: "#ffffff",
+    border: "1px solid #dfe3e8",
+    borderRadius: "8px",
+    fontSize: "14px",
+  },
+
+  cards: {
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(4, minmax(0, 1fr))",
+    gap: "16px",
+    marginBottom: "18px",
+  },
+
+  card: {
+    background: "#ffffff",
+    border: "1px solid #e4e7eb",
+    borderRadius: "10px",
+    padding: "20px",
+    boxSizing: "border-box",
+  },
+
+  cardTitle: {
+    margin: 0,
+    color: "#303846",
+    fontSize: "14px",
+    fontWeight: "600",
+  },
+
+  cardValue: {
+    display: "block",
+    marginTop: "12px",
+    fontSize: "30px",
+    color: "#159447",
+  },
+
+  cardDescription: {
+    display: "block",
+    marginTop: "5px",
+    color: "#7b8494",
+    fontSize: "13px",
+  },
+
+  middleGrid: {
+    display: "grid",
+    gridTemplateColumns:
+      "minmax(0, 1.5fr) minmax(300px, 1fr)",
+    gap: "18px",
+    marginBottom: "18px",
+  },
+
+  panel: {
+    background: "#ffffff",
+    border: "1px solid #e4e7eb",
+    borderRadius: "10px",
+    padding: "20px",
+    marginBottom: "18px",
+  },
+
+  panelHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "20px",
+  },
+
+  panelTitle: {
+    margin: 0,
+    fontSize: "17px",
+  },
+
+  panelDescription: {
+    margin: "5px 0 0",
+    color: "#7b8494",
+    fontSize: "13px",
+  },
+
+  legend: {
+    display: "flex",
+    gap: "15px",
+    fontSize: "12px",
+    color: "#626b7b",
+  },
+
+  legendDot: {
+    display: "inline-block",
+    width: "8px",
+    height: "8px",
+    borderRadius: "50%",
+    marginRight: "5px",
+  },
+
+  chart: {
+    height: "180px",
+    display: "flex",
+    alignItems: "flex-end",
+    justifyContent: "space-around",
+    borderBottom: "1px solid #e5e7eb",
+    padding: "0 10px",
+  },
+
+  chartColumn: {
+    height: "100%",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: "8px",
+  },
+
+  bars: {
+    height: "150px",
+    display: "flex",
+    alignItems: "flex-end",
+    gap: "3px",
+  },
+
+  bar: {
+    width: "12px",
+    minHeight: "4px",
+    borderRadius: "4px 4px 0 0",
+  },
+
+  chartLabel: {
+    fontSize: "11px",
+    color: "#727b8b",
+    marginBottom: "8px",
+  },
+
+  summaryList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "0",
+  },
+
+  summaryRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    padding: "17px 0",
+    borderBottom: "1px solid #edf0f2",
+    fontSize: "14px",
+  },
+
+  viewAll: {
+    color: "#159447",
+    textDecoration: "none",
+    fontWeight: "600",
+    fontSize: "13px",
+  },
+
+  tableWrapper: {
+    overflowX: "auto",
+  },
+
+  table: {
+    width: "100%",
+    borderCollapse: "collapse",
+    fontSize: "14px",
+  },
+
+  th: {
+    textAlign: "left",
+    padding: "12px",
+    background: "#f8f9fa",
+    borderBottom: "1px solid #e5e7eb",
+    color: "#596273",
+    fontWeight: "600",
+    whiteSpace: "nowrap",
+  },
+
+  td: {
+    padding: "14px 12px",
+    borderBottom: "1px solid #edf0f2",
+    whiteSpace: "nowrap",
+  },
+
+  badge: {
+    display: "inline-block",
+    padding: "5px 9px",
+    borderRadius: "6px",
+    fontSize: "12px",
+    fontWeight: "600",
+  },
+
+  updateButton: {
+    padding: "6px 10px",
+    border: "1px solid #b9dec5",
+    borderRadius: "6px",
+    background: "#effaf2",
+    color: "#168b45",
+    cursor: "pointer",
+    fontWeight: "600",
+  },
+
+  stockButton: {
+    marginRight: "5px",
+    padding: "6px 9px",
+    border: "1px solid #d5d9df",
+    borderRadius: "5px",
+    background: "#ffffff",
+    cursor: "pointer",
+    fontWeight: "600",
+  },
+
+  empty: {
+    padding: "35px",
+    textAlign: "center",
+    color: "#777",
+  },
+
+  loading: {
+    minHeight: "100vh",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontFamily: "Arial, sans-serif",
+  },
+};

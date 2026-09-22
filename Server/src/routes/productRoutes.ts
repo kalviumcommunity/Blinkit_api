@@ -50,21 +50,51 @@ router.post("/products", async (req, res) => {
 
 
 
+// router.get("/products", async (_req, res) => {
+//   try {
+//     const products = await db.orm.public.Products.all();
+
+//     return res.json({
+//       products,
+//     });
+//   } catch (error) {
+//     console.error("Failed to fetch products:", error);
+
+//     return res.status(500).json({
+//       message: "Failed to fetch products",
+//     });
+//   }
+// });
+
 router.get("/products", async (_req, res) => {
+  console.log("🔥 GET /products HIT");
+
   try {
+    console.log("🔥 Fetching products from database...");
+
     const products = await db.orm.public.Products.all();
+
+    console.log("✅ Products fetched:", products);
 
     return res.json({
       products,
     });
   } catch (error) {
-    console.error("Failed to fetch products:", error);
+    console.error("❌ REAL PRODUCT ERROR:", error);
 
     return res.status(500).json({
       message: "Failed to fetch products",
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 });
+
+
+
+
+
+
+
 
 router.get("/products/:id", async (req, res) => {
   try {
@@ -392,16 +422,16 @@ router.patch("/products/:id/stock", async (req, res) => {
   }
 });
 
-router.get("/inventory-logs", async (_req, res) => {
-  try {
-    const logs =
-      await db.orm.public.InventoryLogs.all();
+// router.get("/inventory-logs", async (_req, res) => {
+//   try {
+//     const logs =
+//       await db.orm.public.InventoryLogs.all();
 
-    res.json(logs);
-  } catch (error) {
-    console.error("Failed to fetch inventory logs:", error);
+//     res.json(logs);
+//   } catch (error) {
+//     console.error("Failed to fetch inventory logs:", error);
 
-    res.status(500).json({
+//     res.status(500).json({
 // ======================================================
 // GET INVENTORY LOGS
 // GET /api/inventory-logs
