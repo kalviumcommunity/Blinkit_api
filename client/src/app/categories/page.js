@@ -19,56 +19,83 @@ export default function CategoriesPage() {
   ];
 
   return (
-    <main style={{ padding: 30 }}>
-      <h1>Categories</h1>
+    <main className="categories-page">
+      <div className="categories-header">
+        <div>
+          <h1>Categories</h1>
+          <p>Manage and view your inventory by category.</p>
+        </div>
 
-      <p>All product categories.</p>
+        <div className="categories-count">
+          <span>{categories.length}</span>
+          <small>Categories</small>
+        </div>
+      </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns:
-            "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: 20,
-          marginTop: 30,
-        }}
-      >
+      <div className="categories-grid">
         {categories.map((category) => {
-          const categoryProducts =
-            products.filter(
-              (product) =>
-                product.category === category
-            );
+          const categoryProducts = products.filter(
+            (product) => product.category === category
+          );
 
           const stock = categoryProducts.reduce(
-            (total, product) =>
-              total + product.stock,
+            (total, product) => total + product.stock,
             0
           );
 
           return (
             <div
               key={category}
-              style={{
-                border: "1px solid #ddd",
-                borderRadius: 12,
-                padding: 20,
-              }}
+              className="category-card"
             >
+              <div className="category-card-top">
+                <div className="category-icon">📦</div>
+
+                <span className="category-arrow">→</span>
+              </div>
+
               <h2>{category}</h2>
 
-              <p>
-                Products:{" "}
-                {categoryProducts.length}
-              </p>
+              <div className="category-stats">
+                <div>
+                  <span className="category-stat-label">
+                    Products
+                  </span>
 
-              <p>
-                Total Stock: <strong>{stock}</strong>
-              </p>
+                  <strong>{categoryProducts.length}</strong>
+                </div>
+
+                <div>
+                  <span className="category-stat-label">
+                    Total Stock
+                  </span>
+
+                  <strong>{stock}</strong>
+                </div>
+              </div>
+
+              <div className="category-stock-bar">
+                <div
+                  style={{
+                    width: `${Math.min(stock, 100)}%`,
+                  }}
+                />
+              </div>
             </div>
           );
         })}
       </div>
+
+      {categories.length === 0 && (
+        <div className="categories-empty">
+          <div className="categories-empty-icon">📦</div>
+          <h2>No categories found</h2>
+          <p>
+            Categories will appear here once products are
+            added.
+          </p>
+        </div>
+      )}
     </main>
   );
 }

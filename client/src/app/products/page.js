@@ -168,204 +168,176 @@ export default function ProductsPage() {
     );
   }
 
-  return (
-    <main style={{ padding: 30 }}>
-      {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 20,
-        }}
-      >
-        <div>
-          <h1>Products</h1>
-          <p>Manage all inventory products.</p>
-        </div>
-
-        <button onClick={loadProducts}>
-          Refresh
-        </button>
+    return (
+  <main className="products-page">
+    {/* Header */}
+    <div className="products-header">
+      <div>
+        <h1>Products</h1>
+        <p>Manage and update your inventory.</p>
       </div>
 
-      {/* Success message */}
-      {message && (
-        <div
-          style={{
-            background: "#e8f8ef",
-            color: "#087f3f",
-            padding: 12,
-            borderRadius: 8,
-            marginBottom: 20,
-          }}
-        >
-          ✓ {message}
-        </div>
-      )}
-
-      {/* Search + Category */}
-      <div
-        style={{
-          display: "flex",
-          gap: 15,
-          marginBottom: 25,
-          flexWrap: "wrap",
-        }}
+      <button
+        className="products-refresh"
+        onClick={loadProducts}
+        disabled={loading}
       >
+        ↻ Refresh
+      </button>
+    </div>
+
+    {/* Success message */}
+    {message && (
+      <div className="products-success">
+        <span>✓</span>
+        {message}
+      </div>
+    )}
+
+    {/* Filters */}
+    <div className="products-toolbar">
+      <div className="products-search">
+        <span>⌕</span>
+
         <input
           type="text"
-          placeholder="Search product..."
+          placeholder="Search products..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          style={{
-            padding: 12,
-            border: "1px solid #ddd",
-            borderRadius: 8,
-            minWidth: 250,
-          }}
         />
-
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          style={{
-            padding: 12,
-            border: "1px solid #ddd",
-            borderRadius: 8,
-          }}
-        >
-          {categories.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
       </div>
 
-      {/* Product count */}
-      <p style={{ marginBottom: 20 }}>
-        Showing {filteredProducts.length} of{" "}
-        {products.length} products
-      </p>
-
-      {/* Products */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns:
-            "repeat(auto-fit, minmax(280px, 1fr))",
-          gap: 20,
-        }}
+      <select
+        className="products-category"
+        value={category}
+        onChange={(e) => setCategory(e.target.value)}
       >
-        {filteredProducts.map((product) => (
+        {categories.map((item) => (
+          <option key={item} value={item}>
+            {item === "All" ? "All categories" : item}
+          </option>
+        ))}
+      </select>
+    </div>
+
+    {/* Product count */}
+    <div className="products-summary">
+      <div>
+        <strong>{filteredProducts.length}</strong>{" "}
+        {filteredProducts.length === 1
+          ? "product"
+          : "products"}
+      </div>
+
+      {filteredProducts.length !== products.length && (
+        <span>
+          of {products.length} total
+        </span>
+      )}
+    </div>
+
+    {/* Products */}
+    <div className="products-grid">
+      {filteredProducts.map((product) => {
+        let status = "healthy";
+        let statusText = "In stock";
+
+        if (product.stock === 0) {
+          status = "out";
+          statusText = "Out of stock";
+        } else if (product.stock <= 20) {
+          status = "low";
+          statusText = "Low stock";
+        }
+
+        const isUpdating =
+          updatingId === product.id;
+
+        return (
           <div
             key={product.id}
-            style={{
-              border: "1px solid #ddd",
-              borderRadius: 12,
-              padding: 20,
-              background: "#fff",
-            }}
+            className={`product-card ${
+              isUpdating ? "updating" : ""
+            }`}
           >
-            <h2>{product.name}</h2>
+            {/* Product top */}
+            <div className="product-card-top">
+              <div className="product-emoji">
+                📦
+              </div>
 
-            <p>
-              Category: <strong>{product.category}</strong>
-            </p>
+              <span className={`status ${status}`}>
+                {statusText}
+              </span>
+            </div>
 
-            <p>
-              Price: ₹{product.price}
-            </p>
+            {/* Product information */}
+            <div className="product-info">
+              <h2>{product.name}</h2>
 
-            <p
-              style={{
-                fontSize: 20,
-                fontWeight: "bold",
-              }}
-            >
-              Stock: {product.stock}
-            </p>
-
-            {/* Stock status */}
-            {product.stock === 0 && (
-              <p style={{ color: "red" }}>
-                Out of stock
+              <p className="product-category">
+                {product.category}
               </p>
-            )}
+            </div>
 
-            {product.stock > 0 &&
-              product.stock <= 20 && (
-                <p style={{ color: "orange" }}>
-                  Low stock
-                </p>
-              )}
+            {/* Price */}
+            <div className="product-price">
+              ₹{Number(product.price).toFixed(2)}
+            </div>
 
-            {product.stock > 20 && (
-              <p style={{ color: "green" }}>
-                In stock
-              </p>
-            )}
+            {/* Stock */}
+            <div className="product-stock">
+              <span>Current stock</span>
 
-            {/* Buttons */}
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                marginTop: 15,
-              }}
-            >
+              <strong>
+                {product.stock}
+                <small> units</small>
+              </strong>
+            </div>
+
+            {/* Stock controls */}
+            <div className="stock-controls">
               <button
+                className="stock-button decrease"
                 disabled={
-                  updatingId === product.id ||
+                  isUpdating ||
                   product.stock === 0
                 }
                 onClick={() =>
                   changeStock(product.id, -10)
                 }
-                style={{
-                  padding: "10px 18px",
-                  cursor:
-                    updatingId === product.id ||
-                    product.stock === 0
-                      ? "not-allowed"
-                      : "pointer",
-                }}
               >
                 −10
               </button>
 
               <button
-                disabled={updatingId === product.id}
+                className="stock-button increase"
+                disabled={isUpdating}
                 onClick={() =>
                   changeStock(product.id, 10)
                 }
-                style={{
-                  padding: "10px 18px",
-                  cursor:
-                    updatingId === product.id
-                      ? "not-allowed"
-                      : "pointer",
-                }}
               >
-                {updatingId === product.id
-                  ? "Updating..."
-                  : "+10"}
+                {isUpdating ? "Updating..." : "+10"}
               </button>
             </div>
           </div>
-        ))}
-      </div>
+        );
+      })}
+    </div>
 
-      {/* No products */}
-      {filteredProducts.length === 0 && (
-        <div style={{ padding: 30 }}>
-          <h2>No products found</h2>
-          <p>
-            Try another product name or category.
-          </p>
-        </div>
-      )}
-    </main>
-  );
+    {/* No products */}
+    {filteredProducts.length === 0 && (
+      <div className="products-empty">
+        <div>📦</div>
+
+        <h2>No products found</h2>
+
+        <p>
+          Try another product name or category.
+        </p>
+      </div>
+    )}
+  </main>
+);
+  
 }
