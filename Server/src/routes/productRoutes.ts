@@ -48,8 +48,6 @@ router.post("/products", async (req, res) => {
   }
 });
 
-
-
 router.get("/products", async (_req, res) => {
   try {
     const products = await db.orm.public.Products.all();
@@ -123,6 +121,7 @@ router.patch("/products/:id", async (req, res) => {
         message: "Product not found",
       });
     }
+
     const updateData: any = {};
 
     if (name !== undefined) {
@@ -219,7 +218,6 @@ router.patch("/products/:id/stock", async (req, res) => {
     const productId = Number(req.params.id);
     const { change, managerId } = req.body;
 
-
     if (!Number.isInteger(productId)) {
       return res.status(400).json({
         message: "Invalid product ID",
@@ -237,8 +235,8 @@ router.patch("/products/:id/stock", async (req, res) => {
         message: "managerId must be an integer",
       });
     }
+
     const result = await db.transaction(async (tx) => {
-      // First check that the product exists.
       const product = await tx.orm.public.Products
         .where({
           id: productId,
@@ -250,35 +248,6 @@ router.patch("/products/:id/stock", async (req, res) => {
         error.name = "PRODUCT_NOT_FOUND";
         throw error;
       }
-
-      /*
-       * ATOMIC STOCK UPDATE
-       *
-       * PostgreSQL performs:
-       *
-       *     stock = stock + change
-       *
-       * directly inside the UPDATE statement.
-       *
-       * The WHERE condition:
-       *
-       *     stock >= -change
-       *
-       * prevents the stock from becoming negative.
-       *
-       * Example:
-       *
-       * Current stock = 100
-       * Change = -30
-       *
-       * Condition:
-       *
-       * 100 >= 30  -> TRUE
-       *
-       * New stock:
-       *
-       * 100 + (-30) = 70
-       */
 
       const changeParam = param(change, {
         codecId: "pg/int4@1",
@@ -298,16 +267,6 @@ router.patch("/products/:id/stock", async (req, res) => {
         )
         .build();
 
-      /*
-       * IMPORTANT:
-       *
-       * In the Prisma RC version installed in your project,
-       * tx.execute() gives statement statistics.
-       *
-       * So we check affectedRows instead of trying to
-       * read updatedRows[0].
-       */
-
       const updateStats = await tx.execute(updatePlan);
 
       if (updateStats.affectedRows === 0) {
@@ -316,7 +275,6 @@ router.patch("/products/:id/stock", async (req, res) => {
         throw error;
       }
 
-      // Read the updated product inside the SAME transaction.
       const updatedProduct = await tx.orm.public.Products
         .where({
           id: productId,
@@ -329,13 +287,8 @@ router.patch("/products/:id/stock", async (req, res) => {
         throw error;
       }
 
-      // Calculate the old stock from the new stock.
       const newStock = updatedProduct.stock;
       const oldStock = newStock - change;
-
-      // --------------------------------------------------
-      // CREATE INVENTORY LOG
-      // --------------------------------------------------
 
       const inventoryLog =
         await tx.orm.public.InventoryLogs.create({
@@ -352,20 +305,14 @@ router.patch("/products/:id/stock", async (req, res) => {
       };
     });
 
-    // --------------------------------------------------
-    // SUCCESS RESPONSE
-    // --------------------------------------------------
-
     return res.json({
       message: "Stock updated successfully",
       product: result.product,
       inventoryLog: result.inventoryLog,
     });
-
   } catch (error) {
     console.error("Failed to update stock:", error);
 
-    // Product doesn't exist
     if (
       error instanceof Error &&
       error.name === "PRODUCT_NOT_FOUND"
@@ -375,7 +322,6 @@ router.patch("/products/:id/stock", async (req, res) => {
       });
     }
 
-    // Stock would become negative
     if (
       error instanceof Error &&
       error.name === "NEGATIVE_STOCK"
@@ -385,27 +331,11 @@ router.patch("/products/:id/stock", async (req, res) => {
       });
     }
 
-    // Unexpected server/database error
     return res.status(500).json({
       message: "Failed to update stock",
     });
   }
 });
-
-router.get("/inventory-logs", async (_req, res) => {
-  try {
-    const logs =
-      await db.orm.public.InventoryLogs.all();
-
-    res.json(logs);
-  } catch (error) {
-    console.error("Failed to fetch inventory logs:", error);
-
-    res.status(500).json({
-// ======================================================
-// GET INVENTORY LOGS
-// GET /api/inventory-logs
-// ======================================================
 
 router.get("/inventory-logs", async (_req, res) => {
   try {
@@ -422,6 +352,5 @@ router.get("/inventory-logs", async (_req, res) => {
     });
   }
 });
-
 
 export default router;
