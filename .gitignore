@@ -1,0 +1,9 @@
+.local-postgres/
+.local-postgres.log
+node_modules/
+.next/
+.env*
+!.env.example
+legacy/
+*.tsbuildinfo
+test-results/

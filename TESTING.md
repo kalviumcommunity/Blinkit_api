@@ -1,31 +1,46 @@
-# Local verification — 24 September 2026
+# Verification — 24 September 2026
 
-## Implemented and fixed
+## Automated checks
 
-- Added `/signup` and `/login`, inline validation/errors, password visibility, loading states, and sidebar logout/account identity.
-- Added PostgreSQL-backed sessions and scrypt password hashes; protected all inventory endpoints. Logout revokes the session; expired sessions cannot access the API.
-- Replaced the hardcoded manager ID with the authenticated account ID.
-- Switched browser API calls to a same-origin Next.js proxy and added useful connection errors.
-- Fixed invalid stock quantities, overlapping stock edits in the active pages, and the dashboard rollback when only the history refresh failed.
-- Fixed three existing lint errors and the missing CORS TypeScript declarations.
-- Updated Next.js to 16.3.6 and applied compatible security fixes. Frontend audit now reports zero vulnerabilities.
-- Added setup instructions, environment examples, a fresh local inventory schema, and an API smoke test.
+- `npm run typecheck`: passed.
+- `npm run lint`: passed with no errors or warnings.
+- `npm run build`: passed; `/` is the page and `/api/[...path]` serves the backend.
+- `npm test`: **10 integration tests passed** against real PostgreSQL 18. Each run uses a unique temporary schema and cleans it up afterward.
+- Dependency installation audit: **0 vulnerabilities** reported.
 
-## Verified
+## Integration coverage
 
-- `client`: ESLint and production build pass.
-- `Server`: TypeScript check passes.
-- API smoke tests pass against isolated PostgreSQL on `127.0.0.1:55432`: invalid/valid signup, duplicate email normalization, wrong/correct password, session identity, logout/revocation, origin rejection, anonymous access rejection, stock attribution, stock changes, negative-stock rollback, concurrent decrements, product deletion, and history retrieval.
-- Browser: signup → dashboard, visible signed-in identity, logout → login, incorrect-password message, and successful login → dashboard.
-- The API smoke suite also passes through the production Next.js `/api` proxy on port 3000. Database inspection confirms all test-account passwords are stored as salted hashes.
+1. Empty inventory and authentication on all inventory endpoints.
+2. Concurrent additions by **two distinct managers**: 10 + 7 + 5 = 22, both manager IDs recorded, continuous before/after audit chain.
+3. Concurrent removals: only one of two −7 requests against 10 succeeds; final stock is 3 with no failed-change audit entry.
+4. Concurrent retries of the same request UUID apply only once. Another manager cannot reuse it.
+5. An intentionally failed audit insert rolls back the stock update in the same transaction.
+6. Direct stock replacement, invalid quantities, invalid prices, and malformed requests are rejected.
+7. Stale metadata edits return a conflict and cannot overwrite another manager.
+8. Deletion requires zero stock and preserves the historical product name and audit records.
+9. Cross-origin mutations are rejected.
+10. Normalized email uniqueness, password hashing, login, and session revocation.
 
-## Remaining issues / scope
+## Browser verification
 
-- The supplied `Server/.env` database hostname returned `ENOTFOUND`, including with unrestricted network access. Its credentials were neither displayed nor modified. A correct/reachable provider URL is still needed to use that database; no existing remote data was changed or tested.
-- Local verification used an isolated database named `blinkit_test`. Accounts created there do not exist in the provider database. The local database is ignored by Git.
-- Backend `npm audit` still reports 13 findings (8 high, 5 moderate) in the Prisma CLI development-tool dependency tree. Its proposed forced fix switches from Prisma 8 RC to Prisma 7 and would require a separate migration. The experimental CLI also reports conflicting peer versions. Do not apply `npm audit fix --force` blindly.
-- Registration currently grants access to the shared inventory. There are no administrator roles, invitations, email verification, or password recovery. Add those before opening registration to untrusted users. Login throttling is in memory for this single-server setup; multiple servers need shared throttling and deployment-specific proxy configuration.
-- The existing generic product PATCH endpoint permits stock replacement without adding an inventory log. Use the dedicated `/products/:id/stock` endpoint for audited stock changes. Broader CRUD validation (e.g. blank names/invalid prices) also needs tightening.
-- Older unused dashboard/API files remain in the repository; the active frontend lives in `client/src/app`, and the active backend starts at `Server/server.js` → `Server/src/app.ts`.
+Verified in the Codex browser against the actual Next.js app on port 3000:
 
-The API automatically creates only the new `app_users` and `app_sessions` tables on startup. Existing inventory tables and historical manager IDs are not migrated.
+- Signup opens the empty workspace with the new manager ID.
+- Creating a product displays zero stock.
+- Its individual Update button adds 10 units and shows a success message.
+- Stock history displays the correct manager ID, +10 change, 0 → 10 quantity, and timestamp.
+- Removing 11 from a visible stock of 10 shows inline feedback and leaves stock unchanged.
+- Logout returns to the account form; login restores the workspace.
+- The account screen and inventory were visually inspected at the browser's normal narrow viewport. The inventory table scrolls horizontally within its panel.
+
+The temporary UI test account, product, and stock log were removed after verification. The delivered inventory, account list, and history are empty.
+
+## Data preservation
+
+Verified local `public` and `blinkit_legacy_backup` both contain 6 historical logs and 4 manager accounts. The original local products table was empty. Original public tables were not reset. The old project directories are preserved under `legacy/`.
+
+The supplied remote database returned `ENOTFOUND` and could not be tested or backed up. Its saved connection configuration is retained in `.env.previous`; the running application uses the installed local PostgreSQL instance.
+
+## Environment notes
+
+The Windows execution sandbox could not initialize the TypeScript runner's OS user lookup. The app and integration tests ran successfully outside that sandbox using the same documented npm commands. Initial PostgreSQL startup recovered the previously interrupted local cluster; it is now accepting connections.
