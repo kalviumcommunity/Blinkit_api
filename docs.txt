@@ -1,9 +1,0 @@
-Blinkit Inventory Management System 
-ek **Next.js-based inventory app** hai jisme managers products ka stock independently increase/decrease
- kar sakte hain, UI stock update ko immediately optimistic feedback ke saath show karega, 
- successful updates backend/database mein persist honge aur manager ID, previous stock, 
- change, resulting stock aur timestamp ke saath inventory log create hoga; system negative 
- stock ko prevent karega aur sabse important, , toh updates overwrite nahi honge aur final
- stock 105 hoga. MVP ka focus ek reliable end-to-end workflow par hai: **products display 
- → stock update → optimistic UI → backend validation/persistence → audit logging →
-  concurrency protection → failure recovery → refresh persistence**. 

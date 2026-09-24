@@ -1,0 +1,37 @@
+{
+  "name": "blinkit-inventory",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "start": "tsx start.ts",
+    "dev": "tsx start.ts",
+    "build": "next build",
+    "start:production": "tsx start.ts --production",
+    "typecheck": "next typegen && tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write app lib tests start.ts next.config.ts tsconfig.json eslint.config.mjs package.json README.md TESTING.md",
+    "test": "tsx --test tests/inventory.test.ts"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "next": "16.3.6",
+    "pg": "^8.23.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "tsx": "^4.23.13"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@types/pg": "^8",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.6",
+    "prettier": "^3.9.9",
+    "typescript": "^5.9.3"
+  }
+}
