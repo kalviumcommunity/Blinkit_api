@@ -67,14 +67,11 @@ router.post("/products", async (req, res) => {
 // });
 
 router.get("/products", async (_req, res) => {
-  console.log("🔥 GET /products HIT");
 
   try {
-    console.log("🔥 Fetching products from database...");
 
     const products = await db.orm.public.Products.all();
 
-    console.log("✅ Products fetched:", products);
 
     return res.json({
       products,
@@ -84,7 +81,6 @@ router.get("/products", async (_req, res) => {
 
     return res.status(500).json({
       message: "Failed to fetch products",
-      error: error instanceof Error ? error.message : String(error),
     });
   }
 });
@@ -247,7 +243,8 @@ router.delete("/products/:id", async (req, res) => {
 router.patch("/products/:id/stock", async (req, res) => {
   try {
     const productId = Number(req.params.id);
-    const { change, managerId } = req.body;
+    const { change } = req.body;
+    const managerId = res.locals.user.id;
 
 
     if (!Number.isInteger(productId)) {

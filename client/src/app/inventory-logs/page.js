@@ -8,19 +8,18 @@ export default function InventoryLogsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadLogs();
-  }, []);
-
-  async function loadLogs() {
-    try {
-      const data = await getInventoryLogs();
-      setLogs(data);
-    } catch (error) {
-      alert(error.message);
-    } finally {
-      setLoading(false);
+    async function load() {
+      try {
+        const data = await getInventoryLogs();
+        setLogs(data);
+      } catch (error) {
+        alert(error.message);
+      } finally {
+        setLoading(false);
+      }
     }
-  }
+    load();
+  }, []);
 
   if (loading) {
     return <main style={{ padding: 30 }}>Loading logs...</main>;

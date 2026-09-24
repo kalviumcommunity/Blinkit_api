@@ -9,20 +9,19 @@ function Dashboard() {
 
   // Database se products load karo
   useEffect(() => {
-    loadProducts();
-  }, []);
-
-  async function loadProducts() {
-    try {
-      const data = await getProducts();
-      setProducts(data);
-    } catch (error) {
-      console.error("Failed to load products:", error);
-      alert("Failed to load products");
-    } finally {
-      setLoading(false);
+    async function load() {
+      try {
+        const data = await getProducts();
+        setProducts(data);
+      } catch (error) {
+        console.error("Failed to load products:", error);
+        alert("Failed to load products");
+      } finally {
+        setLoading(false);
+      }
     }
-  }
+    load();
+  }, []);
 
   // +10 stock
   async function increaseStock(id) {

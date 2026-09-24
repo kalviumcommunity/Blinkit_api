@@ -1,53 +1,27 @@
-const API_URL =  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
-
-export async function getProducts() {
-  const response = await fetch(`${API_URL}/products`);
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch products");
+export async function request(path, options = {}) {
+  let response;
+  try {
+    response = await fetch(`/api${path}`, {
+      ...options,
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...options.headers },
+      cache: 'no-store',
+    });
+  } catch {
+    throw new Error('Cannot reach the server. Check that the API is running and try again.');
   }
-
-  const data = await response.json();
-
-  return data.products;
-}
-
-export async function updateStock(productId, change) {
-  const response = await fetch(
-    `${API_URL}/products/${productId}/stock`,
-    {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        change,
-        managerId: 1,
-      }),
-    }
-  );
-
-  const data = await response.json();
-
+  const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(
-      data.message || "Stock update failed"
-    );
+    if (response.status === 401 && !path.startsWith('/auth/') && typeof window !== 'undefined') window.location.replace('/login');
+    const error = new Error(data.message || 'The server is unavailable. Please try again.');
+    error.status = response.status;
+    throw error;
   }
-
   return data;
 }
 
-export async function getInventoryLogs() {
-  const response = await fetch(
-    `${API_URL}/inventory-logs`
-  );
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch inventory logs");
-  }
-
-  const data = await response.json();
-
-  return data.logs;
+export async function getProducts() { return (await request('/products')).products; }
+export async function getInventoryLogs() { return (await request('/inventory-logs')).logs; }
+export function updateStock(productId, change) {
+  return request(`/products/${productId}/stock`, { method: 'PATCH', body: JSON.stringify({ change }) });
 }

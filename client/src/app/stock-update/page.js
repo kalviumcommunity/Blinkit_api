@@ -10,32 +10,40 @@ export default function StockUpdatePage() {
   const [products, setProducts] = useState([]);
   const [amounts, setAmounts] = useState({});
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
-    loadProducts();
+    async function load() {
+      try {
+        const data = await getProducts();
+        setProducts(data);
+      } catch (error) {
+        alert(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
   }, []);
 
-  async function loadProducts() {
-    try {
-      const data = await getProducts();
-      setProducts(data);
-    } catch (error) {
-      alert(error.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function changeStock(product, direction) {
-    const amount =
-      Number(amounts[product.id]) || 10;
+    if (updating) return;
+    const amount = Number(amounts[product.id] ?? 10);
+    if (!Number.isInteger(amount) || amount <= 0) {
+      alert('Enter a positive whole-number quantity.');
+      return;
+    }
 
     const change =
       direction === "increase"
         ? amount
         : -amount;
 
-    const oldProducts = [...products];
+    if (product.stock + change < 0) {
+      alert('Stock cannot be negative.');
+      return;
+    }
+    setUpdating(true);
 
     // Optimistic UI
     setProducts((current) =>
@@ -66,8 +74,10 @@ export default function StockUpdatePage() {
         )
       );
     } catch (error) {
-      setProducts(oldProducts);
+      setProducts(current => current.map(p => p.id === product.id ? product : p));
       alert(error.message);
+    } finally {
+      setUpdating(false);
     }
   }
 
@@ -165,7 +175,7 @@ export default function StockUpdatePage() {
                   <input
                     type="number"
                     min="1"
-                    value={amounts[product.id] || 10}
+                    value={amounts[product.id] ?? 10}
                     onChange={(e) =>
                       setAmounts({
                         ...amounts,
@@ -182,7 +192,7 @@ export default function StockUpdatePage() {
                         "decrease"
                       )
                     }
-                    disabled={product.stock === 0}
+                    disabled={updating || product.stock === 0}
                     aria-label={`Decrease ${product.name} stock`}
                   >
                     −
@@ -190,6 +200,7 @@ export default function StockUpdatePage() {
 
                   <button
                     className="stock-increase"
+                    disabled={updating}
                     onClick={() =>
                       changeStock(
                         product,
