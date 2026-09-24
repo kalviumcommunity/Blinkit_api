@@ -44,3 +44,13 @@ The supplied remote database returned `ENOTFOUND` and could not be tested or bac
 ## Environment notes
 
 The Windows execution sandbox could not initialize the TypeScript runner's OS user lookup. The app and integration tests ran successfully outside that sandbox using the same documented npm commands. Initial PostgreSQL startup recovered the previously interrupted local cluster; it is now accepting connections.
+
+## Render installation fix
+
+Render's `npm ci` failure was reproduced locally. The lockfile omitted `@emnapi/core` and `@emnapi/runtime` peer dependencies and had an incompatible `@emnapi/wasi-threads` entry. Regenerating the lockfile with npm 11.19.1 restored these entries without changing the direct dependencies in `package.json`.
+
+- A clean `npm ci --include=dev` installation with npm 11.19.1 passed in an isolated Windows project copy.
+- `npm run build` passed using that freshly installed dependency tree, including TypeScript checks and page generation.
+- An `npm ci --include=dev --dry-run --ignore-scripts --os=linux --cpu=x64 --libc=glibc` check with npm 11.19.1 passed from a separate folder containing only the two package manifests. This verifies Linux dependency resolution; it is not a build executed on Linux or Render.
+
+Keep Render's build command as `npm ci --include=dev && npm run build` and its start command as `npm run start:production`. Deploy the latest commit on `codex/nextjs-inventory` after the lockfile fix is pushed.
