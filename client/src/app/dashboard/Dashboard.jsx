@@ -101,13 +101,60 @@ function Dashboard() {
     return <main>Loading products...</main>;
   }
 
+  const lowStockProducts = products
+  .filter((product) => product.stock > 0 && product.stock <= 20)
+  .sort((a, b) => a.stock - b.stock);
+  
   return (
-    <main>
-      <h1>Inventory</h1>
+  <main>
+    <h1>Inventory</h1>
+
+    {/* LOW STOCK */}
+    <section>
+      <h2>Low Stock Products</h2>
+
+      {lowStockProducts.length === 0 ? (
+        <p>No low-stock products.</p>
+      ) : (
+        lowStockProducts.map((product) => (
+          <div key={product.id}>
+            <h3>{product.name}</h3>
+
+            <p>
+              Category: {product.category}
+            </p>
+
+            <p>
+              Stock: <strong>{product.stock}</strong>
+            </p>
+
+            <button
+              onClick={() =>
+                decreaseStock(product.id)
+              }
+            >
+              -10
+            </button>
+
+            <button
+              onClick={() =>
+                increaseStock(product.id)
+              }
+            >
+              +10
+            </button>
+          </div>
+        ))
+      )}
+    </section>
+
+    {/* ALL PRODUCTS */}
+    <section>
+      <h2>All Products</h2>
 
       {products.map((product) => (
         <div key={product.id}>
-          <h2>{product.name}</h2>
+          <h3>{product.name}</h3>
 
           <p>
             Category: {product.category}
@@ -134,8 +181,9 @@ function Dashboard() {
           </button>
         </div>
       ))}
-    </main>
-  );
+    </section>
+  </main>
+  );  
 }
 
 
