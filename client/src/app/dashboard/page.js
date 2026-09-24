@@ -39,7 +39,7 @@ export default function Dashboard() {
   }
 
   async function changeStock(productId, change) {
-    const oldProducts = [...products];
+    if (updatingId !== null) return;
 
     const product = products.find(
       (p) => p.id === productId
@@ -84,19 +84,19 @@ export default function Dashboard() {
       );
 
       // Refresh inventory logs
-      const updatedLogs =
-        await getInventoryLogs();
-
-      setLogs(updatedLogs);
-
       setMessage(
         `${result.product.name} stock updated successfully.`
       );
+      try {
+        setLogs(await getInventoryLogs());
+      } catch {
+        setMessage('Stock updated, but activity history could not refresh. Use Refresh to try again.');
+      }
     } catch (error) {
       console.error(error);
 
       // Roll back optimistic update
-      setProducts(oldProducts);
+      setProducts(current => current.map(p => p.id === productId ? product : p));
 
       setMessage(error.message);
     } finally {
@@ -485,8 +485,7 @@ export default function Dashboard() {
                       <td>
                         <button
                           disabled={
-                            updatingId ===
-                            product.id
+                            updatingId !== null
                           }
                           onClick={() =>
                             changeStock(
@@ -562,8 +561,7 @@ export default function Dashboard() {
                   <td>
                     <button
                       disabled={
-                        updatingId ===
-                          product.id ||
+                        updatingId !== null ||
                         product.stock <= 0
                       }
                       onClick={() =>
@@ -579,8 +577,7 @@ export default function Dashboard() {
 
                     <button
                       disabled={
-                        updatingId ===
-                        product.id
+                        updatingId !== null
                       }
                       onClick={() =>
                         changeStock(
@@ -595,8 +592,7 @@ export default function Dashboard() {
 
                     <button
                       disabled={
-                        updatingId ===
-                          product.id ||
+                        updatingId !== null ||
                         product.stock < 10
                       }
                       onClick={() =>
@@ -612,8 +608,7 @@ export default function Dashboard() {
 
                     <button
                       disabled={
-                        updatingId ===
-                        product.id
+                        updatingId !== null
                       }
                       onClick={() =>
                         changeStock(

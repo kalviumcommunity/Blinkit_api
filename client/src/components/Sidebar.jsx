@@ -2,8 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { request } from "../lib/api";
 
-export default function Sidebar() {
+export default function Sidebar({ user }) {
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function logout() {
+    setBusy(true);
+    try {
+      await request('/auth/logout', { method: 'POST' });
+      window.location.replace('/login');
+    } catch (error) { setError(error.message); setBusy(false); }
+  }
   const pathname = usePathname();
 
   const navItems = [
@@ -67,17 +78,19 @@ export default function Sidebar() {
       {/* Manager */}
       <div className="sidebar-manager">
         <div className="sidebar-avatar">
-          M
+          {user.name[0].toUpperCase()}
         </div>
 
         <div>
-          <strong>Manager</strong>
+          <strong>{user.name}</strong>
 
           <div className="sidebar-manager-email">
-            manager@blinkit.com
+            {user.email}
           </div>
         </div>
       </div>
+      <button className="auth-logout" disabled={busy} onClick={logout}>{busy ? 'Logging out…' : 'Log out'}</button>
+      {error && <p role="alert">{error}</p>}
     </aside>
   );
 }

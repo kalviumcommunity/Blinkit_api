@@ -35,6 +35,7 @@ export default function ProductsPage() {
 
   // Change stock
   async function changeStock(id, change) {
+    if (updatingId !== null) return;
     // Find current product
     const currentProduct = products.find(
       (product) => product.id === id
@@ -251,7 +252,7 @@ export default function ProductsPage() {
         }
 
         const isUpdating =
-          updatingId === product.id;
+          updatingId !== null;
 
         return (
           <div

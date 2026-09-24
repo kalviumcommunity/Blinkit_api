@@ -1,5 +1,5 @@
 import "./globals.css";
-import Sidebar from "../components/Sidebar";
+import AuthShell from "../components/AuthShell";
 
 export const metadata = {
   title: "Blinkit Inventory Manager",
@@ -10,13 +10,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
-        <div className="app-layout">
-          <Sidebar />
-
-          <main className="main-content">
-            {children}
-          </main>
-        </div>
+        <AuthShell>{children}</AuthShell>
       </body>
     </html>
   );
