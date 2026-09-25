@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { config } from "dotenv";
 import { NextRequest } from "next/server";
+import type { PoolClient } from "pg";
 
 config({ path: [".env.local", ".env"], quiet: true });
 if (process.env.TEST_DATABASE_URL)
@@ -118,6 +119,27 @@ test("fresh inventory is empty; endpoints require a manager session", async () =
   );
   assert.equal((await call("auth/me")).data.user.id, aliceId);
   assert.equal((await call("auth/me")).data.user.password_hash, undefined);
+});
+
+test("new pooled connections select the inventory schema before any transaction", async () => {
+  const clients: PoolClient[] = [];
+  try {
+    // Holding clients forces the pool to open additional connections.
+    for (let i = 0; i < 3; i++) clients.push(await pool().connect());
+    for (const client of clients) {
+      const result = await client.query(
+        "SELECT current_schema() AS active_schema, current_schemas(false)::text[] AS schemas",
+      );
+      assert.equal(result.rows[0].active_schema, schema);
+      assert.deepEqual(result.rows[0].schemas, [schema]);
+      const managers = await client.query(
+        "SELECT count(*)::int AS n FROM app_users",
+      );
+      assert.equal(managers.rows[0].n, 2);
+    }
+  } finally {
+    for (const client of clients) client.release();
+  }
 });
 
 test("two managers' concurrent additions accumulate and have a continuous audit trail", async () => {

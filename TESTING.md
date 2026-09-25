@@ -61,7 +61,8 @@ The supplied Vercel logs show the earlier deployment failing with `ENOTFOUND` an
 
 External Render database URLs now default to verified TLS. Explicit URL SSL settings still take precedence. Server logs classify connection failures using fixed descriptions without logging connection strings, passwords, or raw PostgreSQL error messages.
 
-- All **14 tests passed**: 4 connection/diagnostic checks and the 10 existing real-PostgreSQL integration tests.
+- All **15 tests passed** after integrating remote commit `89020db`: 4 connection/diagnostic checks and 11 real-PostgreSQL integration tests. Each pooled connection now awaits schema setup, and transactions do not fall back to legacy public tables.
+- A new integration regression holds three connections open and verifies that each selects only the inventory schema before any transaction.
 - The connection tests exercise the installed PostgreSQL driver's TLS configuration, explicit verified TLS, encoded credentials, and secret-free diagnostic output. They do not connect to Render.
 - Production build, including TypeScript validation, passed.
 - ESLint passed for the changed TypeScript files.
