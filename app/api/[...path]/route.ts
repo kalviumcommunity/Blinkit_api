@@ -106,9 +106,14 @@ async function handle(request: NextRequest, context: Context) {
     const method = request.method;
     if (method !== "GET") {
       const origin = request.headers.get("origin");
+      // Behind Render's proxy, request.url can contain the internal host/port.
+      // Use the platform's configured public URL, never client-forwarded headers.
+      const expectedOrigin = new URL(
+        process.env.RENDER_EXTERNAL_URL || request.url,
+      ).origin;
       if (
         request.headers.get("sec-fetch-site") === "cross-site" ||
-        (origin && origin !== new URL(request.url).origin)
+        (origin && origin !== expectedOrigin)
       ) {
         throw new ApiError(403, "Requests must come from this application.");
       }

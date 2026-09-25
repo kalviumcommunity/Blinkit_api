@@ -68,3 +68,13 @@ External Render database URLs now default to verified TLS. Explicit URL SSL sett
 - ESLint passed for the changed TypeScript files.
 
 The deployed connection must be checked through `/api/health` after deploying this change with the external Render URL in Vercel's Production environment.
+
+## Render request-origin check — 25 September 2026
+
+The deployed Render service returned HTTP 200 from `/api/health`, but an empty signup request with its own public HTTPS Origin returned HTTP 403. No account was created by this diagnostic request.
+
+Mutation requests now compare the browser Origin with Render's automatically supplied `RENDER_EXTERNAL_URL`. Outside Render, the request URL remains the fallback. Forwarded headers do not supply the trusted origin, and the cross-site Fetch Metadata check remains enforced.
+
+- All **17 tests passed**, including successful signup, login, and stock changes with a public Render origin and an internal request URL.
+- Foreign origins, lookalike domains, HTTP downgrade, the internal origin, opaque origins, and cross-site requests remain rejected. Forged Host and forwarded headers do not bypass the check, and rejected requests do not create products.
+- Production build with TypeScript validation and ESLint for the changed TypeScript files passed.

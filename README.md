@@ -90,6 +90,8 @@ npm run start:production
 
 Tests include database connection configuration checks and integration tests that create a uniquely named temporary schema on a local PostgreSQL connection and remove only their own schemas afterward. They do not reset your inventory. `TEST_DATABASE_URL` can point to a separate local test database. See `TESTING.md` for verification results.
 
+On Render, request-origin checks use the platform-provided `RENDER_EXTERNAL_URL` so signup and stock changes work through its HTTPS proxy. This is set automatically for the service's `onrender.com` URL. Cross-origin writes remain blocked, and client-supplied forwarded headers cannot expand the allowed origin.
+
 ### Vercel with Render Postgres
 
 Set `DATABASE_URL` in the Vercel project's **Production** environment to Render's full **External Database URL**. Render's internal hostname works only within Render's private network. Also set `DATABASE_SCHEMA=blinkit` and `COOKIE_SECURE=true`, then redeploy; environment changes do not update an existing deployment.

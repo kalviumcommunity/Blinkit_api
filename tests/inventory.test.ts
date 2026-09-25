@@ -423,3 +423,97 @@ test("signup normalizes emails; password hashes and session revocation work", as
   alice = login.cookie;
   assert.equal((await call("auth/me")).data.user.id, aliceId);
 });
+
+test("Render's public origin supports signup, login and stock changes behind an internal request URL", async () => {
+  const previousUrl = process.env.RENDER_EXTERNAL_URL;
+  process.env.RENDER_EXTERNAL_URL = "https://inventory-example.onrender.com/";
+  const headers = {
+    Origin: "https://inventory-example.onrender.com",
+    "Sec-Fetch-Site": "same-origin",
+    "X-Forwarded-Proto": "https",
+    "X-Forwarded-Host": "inventory-example.onrender.com",
+  };
+  try {
+    const credentials = {
+      email: "proxy@example.test",
+      password: "Test-password-123",
+    };
+    const signup = await call(
+      "auth/signup",
+      "POST",
+      { name: "Proxy manager", ...credentials },
+      "",
+      headers,
+    );
+    assert.equal(signup.status, 201);
+    assert.ok(signup.cookie);
+    const login = await call("auth/login", "POST", credentials, "", headers);
+    assert.equal(login.status, 200);
+    const created = await call(
+      "products",
+      "POST",
+      { name: "Proxy milk", category: "Dairy", price: 65 },
+      login.cookie,
+      headers,
+    );
+    assert.equal(created.status, 201);
+    const updated = await call(
+      `products/${created.data.product.id}/stock`,
+      "PATCH",
+      { change: 3, requestId: randomUUID() },
+      login.cookie,
+      headers,
+    );
+    assert.equal(updated.status, 200);
+    assert.equal(updated.data.product.stock, 3);
+    assert.equal(updated.data.inventoryLog.manager_id, signup.data.user.id);
+  } finally {
+    if (previousUrl === undefined) delete process.env.RENDER_EXTERNAL_URL;
+    else process.env.RENDER_EXTERNAL_URL = previousUrl;
+  }
+});
+
+test("Render origin checks reject foreign origins and forged forwarded headers without writing data", async () => {
+  const previousUrl = process.env.RENDER_EXTERNAL_URL;
+  process.env.RENDER_EXTERNAL_URL = "https://inventory-example.onrender.com";
+  try {
+    const before = (await call("products")).data.products.length;
+    for (const origin of [
+      "https://untrusted.example",
+      "https://inventory-example.onrender.com.untrusted.example",
+      "http://inventory-example.onrender.com",
+      "http://localhost:3000",
+      "null",
+    ]) {
+      const rejected = await call(
+        "products",
+        "POST",
+        { name: "Rejected", category: "Test", price: 1 },
+        alice,
+        {
+          Origin: origin,
+          Host: "untrusted.example",
+          "X-Forwarded-Host": "untrusted.example",
+          "X-Forwarded-Proto": "https",
+          "Sec-Fetch-Site": "same-origin",
+        },
+      );
+      assert.equal(rejected.status, 403, origin);
+    }
+    const crossSite = await call(
+      "products",
+      "POST",
+      { name: "Rejected", category: "Test", price: 1 },
+      alice,
+      {
+        Origin: "https://inventory-example.onrender.com",
+        "Sec-Fetch-Site": "cross-site",
+      },
+    );
+    assert.equal(crossSite.status, 403);
+    assert.equal((await call("products")).data.products.length, before);
+  } finally {
+    if (previousUrl === undefined) delete process.env.RENDER_EXTERNAL_URL;
+    else process.env.RENDER_EXTERNAL_URL = previousUrl;
+  }
+});
