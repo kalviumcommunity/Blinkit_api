@@ -7,7 +7,12 @@ import {
 import { promisify } from "node:util";
 import { NextRequest, NextResponse } from "next/server";
 import type { PoolClient } from "pg";
-import { initializeDatabase, pool, transaction } from "@/lib/db";
+import {
+  databaseFailureDetails,
+  initializeDatabase,
+  pool,
+  transaction,
+} from "@/lib/db";
 import {
   ApiError,
   changeStock,
@@ -310,7 +315,7 @@ async function handle(request: NextRequest, context: Context) {
         },
         409,
       );
-    console.error("API request failed:", code || (error as Error).name);
+    console.error("API request failed:", databaseFailureDetails(error));
     return json(
       { message: "The database is unavailable. Please try again shortly." },
       503,

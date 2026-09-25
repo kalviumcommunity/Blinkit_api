@@ -54,3 +54,17 @@ Render's `npm ci` failure was reproduced locally. The lockfile omitted `@emnapi/
 - An `npm ci --include=dev --dry-run --ignore-scripts --os=linux --cpu=x64 --libc=glibc` check with npm 11.19.1 passed from a separate folder containing only the two package manifests. This verifies Linux dependency resolution; it is not a build executed on Linux or Render.
 
 Keep Render's build command as `npm ci --include=dev && npm run build` and its start command as `npm run start:production`. Deploy the latest commit on `codex/nextjs-inventory` after the lockfile fix is pushed.
+
+## Vercel / Render database connection — 25 September 2026
+
+The supplied Vercel logs show the earlier deployment failing with `ENOTFOUND` and the deployment using the external database URL failing with PostgreSQL `28000`. This confirms hostname resolution was fixed and PostgreSQL then rejected connection authorization. The original logs contain no PostgreSQL message, so they do not prove whether the rejection was caused by TLS or access rules.
+
+External Render database URLs now default to verified TLS. Explicit URL SSL settings still take precedence. Server logs classify connection failures using fixed descriptions without logging connection strings, passwords, or raw PostgreSQL error messages.
+
+- All **15 tests passed** after integrating remote commit `89020db`: 4 connection/diagnostic checks and 11 real-PostgreSQL integration tests. Each pooled connection now awaits schema setup, and transactions do not fall back to legacy public tables.
+- A new integration regression holds three connections open and verifies that each selects only the inventory schema before any transaction.
+- The connection tests exercise the installed PostgreSQL driver's TLS configuration, explicit verified TLS, encoded credentials, and secret-free diagnostic output. They do not connect to Render.
+- Production build, including TypeScript validation, passed.
+- ESLint passed for the changed TypeScript files.
+
+The deployed connection must be checked through `/api/health` after deploying this change with the external Render URL in Vercel's Production environment.
