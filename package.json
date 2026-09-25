@@ -14,7 +14,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write app lib tests start.ts next.config.ts tsconfig.json eslint.config.mjs package.json README.md TESTING.md",
-    "test": "tsx --test tests/inventory.test.ts"
+    "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "dotenv": "^17.4.2",

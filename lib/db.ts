@@ -1,9 +1,65 @@
-import { Pool, type PoolClient } from "pg";
+import { Pool, type PoolClient, type PoolConfig } from "pg";
 
 const globals = globalThis as unknown as {
   blinkitPool?: Pool;
   blinkitSchemaReady?: Promise<void>;
 };
+
+export function databaseConnectionOptions(
+  connectionString: string,
+): PoolConfig {
+  const hostname = new URL(connectionString).hostname;
+  return {
+    connectionString,
+    // Render's public endpoints require TLS. Keep certificate verification on.
+    // pg still honors explicit SSL parameters in the connection URL.
+    ...(hostname.endsWith(".render.com")
+      ? { ssl: { rejectUnauthorized: true } }
+      : {}),
+  };
+}
+
+export function databaseFailureDetails(error: unknown) {
+  const failure = error as { code?: unknown; message?: unknown } | null;
+  const code =
+    typeof failure?.code === "string" && /^[A-Z0-9_]+$/.test(failure.code)
+      ? failure.code
+      : "UNKNOWN";
+  const message = typeof failure?.message === "string" ? failure.message : "";
+  let reason =
+    "Unexpected server error; inspect the database and deployment configuration.";
+  if (code === "28000") {
+    if (
+      /no encryption|ssl off|ssl (?:is )?required|tls (?:is )?required/i.test(
+        message,
+      )
+    )
+      reason =
+        "PostgreSQL rejected an unencrypted connection. Enable TLS for the external database URL.";
+    else if (/no sni|sni information/i.test(message))
+      reason =
+        "PostgreSQL requires TLS with the full external hostname for SNI.";
+    else if (/pg_hba\.conf/i.test(message))
+      reason =
+        "PostgreSQL rejected this host/user/database combination. Check external access rules and connection credentials.";
+    else
+      reason =
+        "PostgreSQL rejected connection authorization. Check the database role and external access rules.";
+  } else if (code === "28P01") {
+    reason = "PostgreSQL rejected the database username or password.";
+  } else if (code === "ENOTFOUND" || code === "EAI_AGAIN") {
+    reason =
+      "The database hostname could not be resolved. Vercel requires the external database hostname.";
+  } else if (/CERT|SELF_SIGNED|UNABLE_TO_VERIFY/.test(code)) {
+    reason =
+      "The database TLS certificate could not be verified. Check the hostname and certificate configuration.";
+  } else if (code === "ECONNREFUSED" || code === "ETIMEDOUT") {
+    reason =
+      "The database connection was refused or timed out. Check availability and network access.";
+  }
+  // Only fixed descriptions are logged: never raw SQL errors or connection URLs.
+  return { code, reason };
+}
 
 export function schemaName() {
   const schema = process.env.DATABASE_SCHEMA || "blinkit";
@@ -25,7 +81,7 @@ export function pool() {
       "Set DATABASE_URL in .env.local before starting the application.",
     );
   return (globals.blinkitPool ??= new Pool({
-    connectionString: process.env.DATABASE_URL,
+    ...databaseConnectionOptions(process.env.DATABASE_URL),
     options: `-c search_path=${schemaName()}`,
     max: 10,
     connectionTimeoutMillis: 5000,

@@ -88,7 +88,17 @@ npm run start:production
 
 `npm start` and `npm run dev` start development mode. Production mode requires `npm run build` first and still uses the same `start.ts` launcher. Stop the development server before starting production on the same port.
 
-Tests create a uniquely named temporary schema on a local PostgreSQL connection and remove only their own schemas afterward. They do not reset your inventory. `TEST_DATABASE_URL` can point to a separate local test database. See `TESTING.md` for verification results.
+Tests include database connection configuration checks and integration tests that create a uniquely named temporary schema on a local PostgreSQL connection and remove only their own schemas afterward. They do not reset your inventory. `TEST_DATABASE_URL` can point to a separate local test database. See `TESTING.md` for verification results.
+
+### Vercel with Render Postgres
+
+Set `DATABASE_URL` in the Vercel project's **Production** environment to Render's full **External Database URL**. Render's internal hostname works only within Render's private network. Also set `DATABASE_SCHEMA=blinkit` and `COOKIE_SECURE=true`, then redeploy; environment changes do not update an existing deployment.
+
+The app enables TLS with certificate verification by default for external `.render.com` database hosts. Explicit SSL parameters in the URL take precedence; use `sslmode=verify-full` if specifying a mode, and remove `sslmode=disable`. Local and Render internal connections retain their existing configuration.
+
+Open `/api/health` on the deployed site to verify the connection. A healthy response is `{"status":"ok","database":"connected"}`. If it fails, Vercel's runtime logs include `API request failed:` with a code and a safe description. `ENOTFOUND` means hostname resolution failed; `28000` means PostgreSQL rejected connection authorization, which can include TLS or external access restrictions; `28P01` means database credentials were rejected. Logs never include raw connection URLs or passwords.
+
+See [Render's database connection instructions](https://render.com/docs/postgresql-creating-connecting) and [Vercel's environment variable documentation](https://vercel.com/docs/environment-variables).
 
 Passwords use salted scrypt hashes. Sessions use HttpOnly/SameSite cookies and expire after seven days. This is a shared team/demo workspace: anyone who registers can manage the inventory. Use `COOKIE_SECURE=true` behind HTTPS. Invitation-only access, password recovery, and distributed login throttling are outside this assignment.
 
